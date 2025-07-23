@@ -1,0 +1,59 @@
+<div class="sidebar">
+    <div class="sidebar-header">
+        <a class="app-logo" href="{{ url_for('dashboard') }}">
+            <i class="fas fa-shield-alt"></i> <span>Meu App Risk</span>
+        </a>
+    </div>
+    <nav class="sidebar-nav">
+        <ul>
+            <li class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                <a href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item-header">Gerenciamento</li>
+            <li class="nav-item {% if active_page == 'executives' %}active{% endif %}">
+                <a href="{{ url_for('executives') }}">
+                    <i class="fas fa-fw fa-user-tie"></i>
+                    <span>Executivos</span>
+                </a>
+            </li>
+            <li class="nav-item {% if active_page == 'items' %}active{% endif %}">
+                <a href="{{ url_for('items') }}">
+                    <i class="fas fa-fw fa-search"></i>
+                    <span>Itens Identificados</span>
+                </a>
+            </li>
+            <li class="nav-item-header">Relatórios & Configurações</li>
+            <li class="nav-item {% if active_page == 'reports' %}active{% endif %}">
+                <a href="{{ url_for('reports') }}">
+                    <i class="fas fa-fw fa-chart-line"></i>
+                    <span>Relatórios</span>
+                </a>
+            </li>
+            <li class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+                <a href="{{ url_for('settings') }}">
+                    <i class="fas fa-fw fa-cogs"></i>
+                    <span>Configurações</span>
+                </a>
+            </li>
+            <li class="nav-item-header user-menu">
+                <a href="#" class="user-info-toggle">
+                    <i class="fas fa-user-circle"></i>
+                    <span>{{ current_user.username if current_user.is_authenticated else 'Usuário' }}</span>
+                    <i class="fas fa-caret-down float-right"></i>
+                </a>
+                <ul class="user-submenu"> {# Adicione esta lista para o submenu se for JS #}
+                    <li><a href="{{ url_for('settings') }}"><i class="fas fa-cogs"></i> Configurações</a></li>
+                    <li><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </li>
+        </ul>
+    </nav>
+    <div class="sidebar-footer">
+        <a href="{{ url_for('logout') }}" class="btn-logout">
+            <i class="fas fa-sign-out-alt"></i> Sair
+        </a>
+    </div>
+</div>

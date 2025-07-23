@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erro - Meu Projeto</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <h2>🚨 Erro na Aplicação</h2>
+            <div class="error-message">
+                <p>{{ error if error else 'Ocorreu um erro inesperado.' }}</p>
+            </div>
+            <div class="error-actions">
+                <a href="{{ url_for('login') }}" class="btn-primary">Voltar ao Login</a>
+                <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('login') }}" class="btn-secondary">
+                    {{ 'Dashboard' if current_user.is_authenticated else 'Login' }}
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

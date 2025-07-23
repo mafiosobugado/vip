@@ -1,0 +1,10 @@
+<nav class="navbar">
+    <div class="navbar-left">
+        <h3>{% block header_title %}{% endblock %}</h3> </div>
+    <div class="navbar-right">
+        <span class="user-info">Olá, {{ current_user.username if current_user.is_authenticated else 'Visitante' }}</span>
+        <div class="user-avatar">
+            <i class="fas fa-user-circle"></i>
+        </div>
+    </div>
+</nav>

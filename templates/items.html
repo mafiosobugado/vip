@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Itens Identificados{% endblock %}
+
+{% block page_title %}Itens Identificados{% endblock %}
+
+{% block content %}
+    <div class="content-header">
+        <h1>Gerenciamento de Itens Identificados</h1>
+        <a href="{{ url_for('add_item') }}" class="btn-action btn-add-new">
+            <i class="fas fa-plus"></i> Novo Item
+        </a>
+    </div>
+
+    <div class="filter-section">
+        <div class="form-group-inline">
+            <label for="filterStatus">STATUS:</label>
+            <select id="filterStatus" onchange="applyFilter()">
+                <option value="Todos">Todos os Status</option>
+                <option value="PENDENTE">PENDENTE</option>
+                <option value="TRATADO">TRATADO</option>
+                <option value="IGNORADO">IGNORADO</option>
+            </select>
+        </div>
+        <div class="form-group-inline">
+            <label for="filterExecutive">EXECUTIVO:</label>
+            <select id="filterExecutive" onchange="applyFilter()">
+                <option value="Todos">Selecione um executivo</option>
+                {% for exec in executives %}
+                    <option value="{{ exec.id }}">{{ exec.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="data-table-container">
+        {% if items %}
+        <table id="itemsTable">
+            <thead>
+                <tr>
+                    <th>Executivo</th>
+                    <th>Título</th>
+                    <th>Tipo</th>
+                    <th>Severidade</th>
+                    <th>Status</th>
+                    <th>Data de Identificação</th>
+                    <th class="actions-col">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr data-status="{{ item.status }}" data-executive-id="{{ item.executive_id }}">
+                    <td data-label="Executivo">{{ item.executive_name }}</td>
+                    <td data-label="Título">{{ item.title }}</td>
+                    <td data-label="Tipo">{{ item.type }}</td>
+                    <td data-label="Severidade">
+                        <span class="severity-tag severity-{{ item.severity | lower }}">{{ item.severity }}</span>
+                    </td>
+                    <td data-label="Status">
+                        <span class="status-tag status-{{ item.status | lower }}">{{ item.status }}</span>
+                    </td>
+                    <td data-label="Data">{{ item.identified_date }}</td>
+                    <td data-label="Ações" class="actions-col">
+                        <div class="action-buttons-group">
+                            <button class="btn-action btn-edit" onclick="openEditItemModal({{ item.id }}, {{ item.executive_id }}, '{{ item.title }}', '{{ item.description or '' }}', '{{ item.type }}', '{{ item.severity }}', '{{ item.status }}', '{{ item.identified_date }}')" title="Editar Item">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form action="{{ url_for('delete_item', item_id=item.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir este item?');">
+                                <button type="submit" class="btn-action btn-delete" title="Excluir Item">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </form>
+                            {% if item.status == 'PENDENTE' %}
+                            <form action="{{ url_for('mark_item_treated', item_id=item.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn-action btn-treat" title="Marcar como Tratado">
+                                    <i class="fas fa-check-circle"></i>
+                                </button>
+                            </form>
+                            <form action="{{ url_for('mark_item_ignored', item_id=item.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn-action btn-ignore" title="Marcar como Ignorado">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>Nenhum item identificado cadastrado ainda. <a href="{{ url_for('add_item') }}">Adicione um agora!</a></p>
+        {% endif %}
+    </div>
+
+    <!-- Modal para Editar Item -->
+    <div id="editItemModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close-button" onclick="closeModal('editItemModal')">&times;</span>
+            <div class="modal-header">
+                <i class="fas fa-edit"></i>
+                <h2>Editar Item Identificado</h2>
+            </div>
+            <form id="editItemForm" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editExecutiveId">Executivo:</label>
+                        <select id="editExecutiveId" name="executive_id" required>
+                            {% for exec in executives %}
+                                <option value="{{ exec.id }}">{{ exec.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editItemType">Tipo:</label>
+                        <select id="editItemType" name="type" required>
+                            <option value="NOTÍCIA">NOTÍCIA</option>
+                            <option value="PROCESSO">PROCESSO</option>
+                            <option value="INVESTIGAÇÃO">INVESTIGAÇÃO</option>
+                            <option value="OUTRO">OUTRO</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editTitle">Título:</label>
+                    <input type="text" id="editTitle" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="editDescription">Descrição:</label>
+                    <textarea id="editDescription" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editSeverity">Severidade:</label>
+                        <select id="editSeverity" name="severity" required>
+                            <option value="BAIXA">BAIXA</option>
+                            <option value="MÉDIA">MÉDIA</option>
+                            <option value="ALTA">ALTA</option>
+                            <option value="CRÍTICA">CRÍTICA</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStatus">Status:</label>
+                        <select id="editStatus" name="status" required>
+                            <option value="PENDENTE">PENDENTE</option>
+                            <option value="TRATADO">TRATADO</option>
+                            <option value="IGNORADO">IGNORADO</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editIdentifiedDate">Data de Identificação:</label>
+                        <input type="date" id="editIdentifiedDate" name="identified_date" required>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-action btn-cancel" onclick="closeModal('editItemModal')">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn-action btn-save">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function applyFilter() {
+            const statusFilter = document.getElementById('filterStatus').value;
+            const executiveFilter = document.getElementById('filterExecutive').value;
+            const table = document.getElementById('itemsTable');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) { // Começa do 1 para pular o cabeçalho
+                const row = rows[i];
+                const itemStatus = row.getAttribute('data-status');
+                const itemExecutiveId = row.getAttribute('data-executive-id');
+
+                const statusMatch = (statusFilter === 'Todos' || itemStatus === statusFilter);
+                const executiveMatch = (executiveFilter === 'Todos' || itemExecutiveId === executiveFilter);
+
+                if (statusMatch && executiveMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+
+        function openEditItemModal(id, executiveId, title, description, type, severity, status, identifiedDate) {
+            document.getElementById('editExecutiveId').value = executiveId;
+            document.getElementById('editTitle').value = title;
+            document.getElementById('editDescription').value = description;
+            document.getElementById('editItemType').value = type;
+            document.getElementById('editSeverity').value = severity;
+            document.getElementById('editStatus').value = status;
+            document.getElementById('editIdentifiedDate').value = identifiedDate;
+            
+            document.getElementById('editItemForm').action = `/edit_item/${id}`;
+            openModal('editItemModal');
+        }
+    </script>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal-handler.js') }}"></script>
+{% endblock %}

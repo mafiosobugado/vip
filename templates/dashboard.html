@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+    <div class="dashboard-header">
+        <h1>Visão geral do monitoramento de executivos e score de risco</h1>
+    </div>
+
+    <div class="dashboard-cards">
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-value">{{ total_executives }}</span>
+                <span class="card-title">TOTAL DE EXECUTIVOS</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-icon icon-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-value">{{ critical_pending_items }}</span>
+                <span class="card-title">DADOS CRÍTICOS (NÃO TRATADOS)</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-icon icon-warning">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-value">{{ average_risk_score }}</span>
+                <span class="card-title">SCORE DE RISCO MÉDIO</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-icon icon-success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-value">{{ treated_items_last_30_days }}</span>
+                <span class="card-title">ITENS TRATADOS (ÚLTIMOS 30 DIAS)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-charts">
+        <div class="chart-card">
+            <h2>Distribuição de Nível de Risco</h2>
+            <canvas id="riskLevelChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h2>Tendência de Itens Identificados</h2>
+            <canvas id="itemsTrendChart"></canvas>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Dados do dashboard disponíveis globalmente
+        window.dashboardData = {
+            riskDistribution: {{ risk_level_distribution | tojson }},
+            itemsTrend: {{ identified_items_trend | tojson }}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}
