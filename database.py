@@ -46,11 +46,21 @@ def init_db():
             severity TEXT NOT NULL, -- Ex: BAIXA, MEDIA, ALTA, CRITICA
             status TEXT NOT NULL, -- Ex: PENDENTE, TRATADO, IGNORADO
             identified_date TEXT NOT NULL, -- Data no formato YYYY-MM-DD
+            image_filename TEXT, -- Nome do arquivo de imagem (opcional)
             FOREIGN KEY (executive_id) REFERENCES executives (id) ON DELETE CASCADE
         );
     ''')
 
     conn.commit()
+    
+    # Adicionar coluna image_filename se não existir (para compatibilidade com bancos existentes)
+    try:
+        cursor.execute('ALTER TABLE items ADD COLUMN image_filename TEXT')
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Coluna já existe, ignorar erro
+        pass
+    
     conn.close()
     print("Banco de dados inicializado e tabelas criadas (se não existiam).")
 
@@ -158,10 +168,10 @@ def delete_executive(executive_id):
     conn.close()
 
 # --- Funções para a tabela ITEMS ---
-def add_item(executive_id, title, description, item_type, severity, status, identified_date):
+def add_item(executive_id, title, description, item_type, severity, status, identified_date, image_filename=None):
     conn = get_db_connection()
-    conn.execute('INSERT INTO items (executive_id, title, description, type, severity, status, identified_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                 (executive_id, title, description, item_type, severity, status, identified_date))
+    conn.execute('INSERT INTO items (executive_id, title, description, type, severity, status, identified_date, image_filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                 (executive_id, title, description, item_type, severity, status, identified_date, image_filename))
     conn.commit()
     conn.close()
 
@@ -177,10 +187,14 @@ def get_item_by_id(item_id):
     conn.close()
     return item
 
-def update_item(item_id, executive_id, title, description, item_type, severity, status, identified_date):
+def update_item(item_id, executive_id, title, description, item_type, severity, status, identified_date, image_filename=None):
     conn = get_db_connection()
-    conn.execute('UPDATE items SET executive_id = ?, title = ?, description = ?, type = ?, severity = ?, status = ?, identified_date = ? WHERE id = ?',
-                 (executive_id, title, description, item_type, severity, status, identified_date, item_id))
+    if image_filename is not None:
+        conn.execute('UPDATE items SET executive_id = ?, title = ?, description = ?, type = ?, severity = ?, status = ?, identified_date = ?, image_filename = ? WHERE id = ?',
+                     (executive_id, title, description, item_type, severity, status, identified_date, image_filename, item_id))
+    else:
+        conn.execute('UPDATE items SET executive_id = ?, title = ?, description = ?, type = ?, severity = ?, status = ?, identified_date = ? WHERE id = ?',
+                     (executive_id, title, description, item_type, severity, status, identified_date, item_id))
     conn.commit()
     conn.close()
 
@@ -199,15 +213,35 @@ def get_total_executives_count():
 
 def get_critical_pending_items_count():
     conn = get_db_connection()
-    count = conn.execute("SELECT COUNT(*) FROM items WHERE status = 'PENDENTE' AND severity = 'CRITICA'").fetchone()[0]
+    count = conn.execute("SELECT COUNT(*) FROM items WHERE status = 'PENDENTE' AND (severity = 'CRITICA' OR severity = 'CRÍTICA')").fetchone()[0]
     conn.close()
     return count
 
-def get_average_risk_score_value():
+def get_average_severity_score():
     conn = get_db_connection()
-    avg_score = conn.execute('SELECT AVG(risk_score) FROM executives').fetchone()[0]
+    # Mapear severidades para valores numéricos para calcular média
+    severity_map = {'BAIXA': 1, 'MEDIA': 2, 'MÉDIA': 2, 'ALTA': 3, 'CRITICA': 4, 'CRÍTICA': 4}
+    reverse_map = {1: 'BAIXA', 2: 'MEDIA', 3: 'ALTA', 4: 'CRITICA'}
+    
+    results = conn.execute('SELECT severity FROM items').fetchall()
     conn.close()
-    return round(avg_score, 2) if avg_score is not None else 0.0
+    
+    if not results:
+        return 'BAIXA'
+    
+    total_score = 0
+    count = 0
+    for row in results:
+        severity = row[0]
+        if severity in severity_map:
+            total_score += severity_map[severity]
+            count += 1
+    
+    if count == 0:
+        return 'BAIXA'
+    
+    avg_score = round(total_score / count)
+    return reverse_map.get(avg_score, 'BAIXA')
 
 def get_treated_items_last_30_days_count():
     conn = get_db_connection()
@@ -217,21 +251,29 @@ def get_treated_items_last_30_days_count():
     conn.close()
     return count
 
-def get_risk_level_distribution_data():
+def get_severity_distribution_data():
     conn = get_db_connection()
-    # Garante que todos os níveis de risco sejam considerados, mesmo que com contagem 0
-    levels = ['NENHUM', 'BAIXO', 'MÉDIO', 'ALTO', 'CRÍTICO']
-    distribution = {level: 0 for level in levels}
+    # Garante que todos os níveis de severidade sejam considerados, mesmo que com contagem 0
+    levels = ['BAIXA', 'MEDIA', 'MÉDIA', 'ALTA', 'CRITICA', 'CRÍTICA']
+    distribution = {'BAIXA': 0, 'MEDIA': 0, 'ALTA': 0, 'CRITICA': 0}
 
-    results = conn.execute('SELECT risk_level, COUNT(*) FROM executives GROUP BY risk_level').fetchall()
+    results = conn.execute('SELECT severity, COUNT(*) FROM items GROUP BY severity').fetchall()
     conn.close()
 
     for row in results:
         level = row[0]
         count = row[1]
-        if level in distribution:
+        # Normalizar as variações com e sem acento
+        if level in ['MEDIA', 'MÉDIA']:
+            distribution['MEDIA'] += count
+        elif level in ['CRITICA', 'CRÍTICA']:
+            distribution['CRITICA'] += count
+        elif level in distribution:
             distribution[level] = count
-    return distribution
+    
+    # Remover as chaves temporárias se não foram usadas
+    final_distribution = {k: v for k, v in distribution.items() if k in ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA']}
+    return final_distribution
 
 def get_identified_items_trend_data(num_weeks=8):
     conn = get_db_connection()

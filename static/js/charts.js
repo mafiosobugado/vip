@@ -1,14 +1,13 @@
 // static/js/charts.js
 
-// Pega as cores das variáveis CSS
-function getRiskColors() {
+// Pega as cores das variáveis CSS para severidade
+function getSeverityColors() {
     const root = getComputedStyle(document.documentElement);
     return [
-        root.getPropertyValue('--risk-nenhum').trim(),
-        root.getPropertyValue('--risk-baixo').trim(), 
-        root.getPropertyValue('--risk-medio').trim(),
-        root.getPropertyValue('--risk-alto').trim(),
-        root.getPropertyValue('--risk-critico').trim()
+        root.getPropertyValue('--risk-baixo').trim(),   // BAIXA
+        root.getPropertyValue('--risk-medio').trim(),   // MEDIA
+        root.getPropertyValue('--risk-alto').trim(),    // ALTA
+        root.getPropertyValue('--risk-critico').trim()  // CRITICA
     ];
 }
 
@@ -30,28 +29,38 @@ function getTextColorLight2() {
 
 document.addEventListener('DOMContentLoaded', function() {
     // Verificar se os dados existem
-    if (window.dashboardData && window.dashboardData.riskDistribution && window.dashboardData.itemsTrend) {
-        createRiskLevelChart(window.dashboardData.riskDistribution);
-        createItemsTrendChart(window.dashboardData.itemsTrend);
+    if (window.dashboardData) {
+        console.log('Dashboard data:', window.dashboardData);
+        
+        if (window.dashboardData.severityDistribution) {
+            createSeverityDistributionChart(window.dashboardData.severityDistribution);
+        } else {
+            console.warn("Dados de distribuição de severidade não encontrados.");
+        }
+        
+        if (window.dashboardData.itemsTrend) {
+            createItemsTrendChart(window.dashboardData.itemsTrend);
+        } else {
+            console.warn("Dados de tendência de itens não encontrados.");
+        }
     } else {
         console.warn("Dados do dashboard não encontrados. Gráficos não serão renderizados.");
     }
 });
 
-function createRiskLevelChart(data) {
-    const ctx = document.getElementById('riskLevelChart');
+function createSeverityDistributionChart(data) {
+    const ctx = document.getElementById('severityDistributionChart');
     if (!ctx) return;
 
     const labels = Object.keys(data);
     const values = Object.values(data);
     
-    // Mapear cores específicas para cada nível de risco
+    // Mapear cores específicas para cada nível de severidade
     const colorMap = {
-        'NENHUM': getComputedStyle(document.documentElement).getPropertyValue('--risk-nenhum').trim(),
-        'BAIXO': getComputedStyle(document.documentElement).getPropertyValue('--risk-baixo').trim(),
-        'MÉDIO': getComputedStyle(document.documentElement).getPropertyValue('--risk-medio').trim(),
-        'ALTO': getComputedStyle(document.documentElement).getPropertyValue('--risk-alto').trim(),
-        'CRÍTICO': getComputedStyle(document.documentElement).getPropertyValue('--risk-critico').trim()
+        'BAIXA': getComputedStyle(document.documentElement).getPropertyValue('--risk-baixo').trim(),
+        'MEDIA': getComputedStyle(document.documentElement).getPropertyValue('--risk-medio').trim(),
+        'ALTA': getComputedStyle(document.documentElement).getPropertyValue('--risk-alto').trim(),
+        'CRITICA': getComputedStyle(document.documentElement).getPropertyValue('--risk-critico').trim()
     };
     
     const backgroundColors = labels.map(label => colorMap[label.toUpperCase()] || '#6c757d');

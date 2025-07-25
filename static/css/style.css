@@ -696,6 +696,7 @@ canvas {
 
 .severity-baixa { background: var(--risk-baixo); }
 .severity-media { background: var(--risk-medio); }
+.severity-média { background: var(--risk-medio); }
 .severity-alta { background: var(--risk-alto); }
 .severity-critica { background: var(--risk-critico); }
 .severity-crítica { background: var(--risk-critico); }

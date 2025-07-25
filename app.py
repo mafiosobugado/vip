@@ -1,13 +1,27 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import database # Importe seu módulo de banco de dados
 import datetime
 import traceback
+import os
+import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'uma_chave_secreta_muito_segura_e_longa_aqui_para_producao' # MUDE ISSO EM PRODUÇÃO!
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(minutes=30) # Exemplo: sessão dura 30 minutos
+app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB máximo
+
+# Criar diretório de uploads se não existir
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -119,18 +133,18 @@ def dashboard():
     try:
         total_executives = database.get_total_executives_count()
         critical_pending_items = database.get_critical_pending_items_count()
-        average_risk_score = database.get_average_risk_score_value()
+        average_severity = database.get_average_severity_score()
         treated_items_last_30_days = database.get_treated_items_last_30_days_count()
-        risk_level_distribution = database.get_risk_level_distribution_data()
+        severity_distribution = database.get_severity_distribution_data()
         identified_items_trend = database.get_identified_items_trend_data()
 
         return render_template(
             'dashboard.html',
             total_executives=total_executives,
             critical_pending_items=critical_pending_items,
-            average_risk_score=average_risk_score,
+            average_severity=average_severity,
             treated_items_last_30_days=treated_items_last_30_days,
-            risk_level_distribution=risk_level_distribution,
+            severity_distribution=severity_distribution,
             identified_items_trend=identified_items_trend,
             active_page='dashboard'
         )
@@ -141,9 +155,9 @@ def dashboard():
         return render_template('dashboard.html', 
                              total_executives=0, 
                              critical_pending_items=0,
-                             average_risk_score=0.0,
+                             average_severity='BAIXA',
                              treated_items_last_30_days=0,
-                             risk_level_distribution={},
+                             severity_distribution={},
                              identified_items_trend={'dates': [], 'counts': []},
                              active_page='dashboard')
 
@@ -161,8 +175,9 @@ def add_executive():
         email = request.form['email']
         role = request.form.get('role')
         department = request.form.get('department')
-        risk_score = float(request.form['risk_score'])
-        risk_level = request.form['risk_level']
+        # Usar valores padrão para risk_score e risk_level
+        risk_score = 0.0
+        risk_level = 'NENHUM'
 
         if database.add_executive(name, email, role, department, risk_score, risk_level):
             flash('Executivo adicionado com sucesso!', 'success')
@@ -185,8 +200,9 @@ def edit_executive(executive_id):
         email = request.form['email']
         role = request.form.get('role')
         department = request.form.get('department')
-        risk_score = float(request.form['risk_score'])
-        risk_level = request.form['risk_level']
+        # Manter os valores existentes de risk_score e risk_level
+        risk_score = executive['risk_score']
+        risk_level = executive['risk_level']
 
         if database.update_executive(executive_id, name, email, role, department, risk_score, risk_level):
             flash('Executivo atualizado com sucesso!', 'success')
@@ -223,8 +239,19 @@ def add_item():
         severity = request.form['severity']
         status = request.form['status']
         identified_date = request.form['identified_date']
+        
+        # Lidar com upload de imagem
+        image_filename = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename != '' and allowed_file(file.filename):
+                # Gerar nome único para o arquivo
+                filename = str(uuid.uuid4()) + '.' + file.filename.rsplit('.', 1)[1].lower()
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                image_filename = filename
 
-        database.add_item(executive_id, title, description, item_type, severity, status, identified_date)
+        database.add_item(executive_id, title, description, item_type, severity, status, identified_date, image_filename)
         flash('Item identificado adicionado com sucesso!', 'success')
         return redirect(url_for('items'))
     return render_template('add_edit_item.html', item=None, executives=executives_list, active_page='items')
@@ -246,8 +273,28 @@ def edit_item(item_id):
         severity = request.form['severity']
         status = request.form['status']
         identified_date = request.form['identified_date']
+        
+        # Lidar com upload de nova imagem
+        image_filename = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename != '' and allowed_file(file.filename):
+                # Remover imagem antiga se existir
+                if hasattr(item, 'image_filename') and item['image_filename']:
+                    old_file_path = os.path.join(app.config['UPLOAD_FOLDER'], item['image_filename'])
+                    if os.path.exists(old_file_path):
+                        os.remove(old_file_path)
+                
+                # Salvar nova imagem
+                filename = str(uuid.uuid4()) + '.' + file.filename.rsplit('.', 1)[1].lower()
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                image_filename = filename
+            elif hasattr(item, 'image_filename'):
+                # Manter imagem existente se não houver nova
+                image_filename = item['image_filename']
 
-        database.update_item(item_id, executive_id, title, description, item_type, severity, status, identified_date)
+        database.update_item(item_id, executive_id, title, description, item_type, severity, status, identified_date, image_filename)
         flash('Item atualizado com sucesso!', 'success')
         return redirect(url_for('items'))
     return render_template('add_edit_item.html', item=item, executives=executives_list, active_page='items')
@@ -265,7 +312,8 @@ def delete_item(item_id):
 def mark_item_treated(item_id):
     item = database.get_item_by_id(item_id)
     if item:
-        database.update_item(item_id, item['executive_id'], item['title'], item['description'], item['type'], item['severity'], 'TRATADO', item['identified_date'])
+        image_filename = item.get('image_filename') if hasattr(item, 'get') else item['image_filename'] if 'image_filename' in item else None
+        database.update_item(item_id, item['executive_id'], item['title'], item['description'], item['type'], item['severity'], 'TRATADO', item['identified_date'], image_filename)
         flash('Item marcado como TRATADO!', 'success')
     else:
         flash('Item não encontrado.', 'danger')
@@ -276,7 +324,8 @@ def mark_item_treated(item_id):
 def mark_item_ignored(item_id):
     item = database.get_item_by_id(item_id)
     if item:
-        database.update_item(item_id, item['executive_id'], item['title'], item['description'], item['type'], item['severity'], 'IGNORADO', item['identified_date'])
+        image_filename = item.get('image_filename') if hasattr(item, 'get') else item['image_filename'] if 'image_filename' in item else None
+        database.update_item(item_id, item['executive_id'], item['title'], item['description'], item['type'], item['severity'], 'IGNORADO', item['identified_date'], image_filename)
         flash('Item marcado como IGNORADO!', 'info')
     else:
         flash('Item não encontrado.', 'danger')

@@ -21,8 +21,6 @@
                     <th>Email</th>
                     <th>Cargo</th>
                     <th>Departamento</th>
-                    <th>Score de Risco</th>
-                    <th>Nível de Risco</th>
                     <th class="actions-col">Ações</th>
                 </tr>
             </thead>
@@ -33,21 +31,15 @@
                     <td data-label="Email">{{ exec.email }}</td>
                     <td data-label="Cargo">{{ exec.role if exec.role else '-' }}</td>
                     <td data-label="Departamento">{{ exec.department if exec.department else '-' }}</td>
-                    <td data-label="Score de Risco">{{ exec.risk_score }}</td>
-                    <td data-label="Nível de Risco">
-                        <span class="risk-level-tag risk-{{ exec.risk_level | lower }}">{{ exec.risk_level }}</span>
-                    </td>
-                    <td data-label="Ações" class="actions-col">
-                        <div class="action-buttons-group">
-                            <button class="btn-action btn-edit" onclick="openEditExecutiveModal({{ exec.id }}, '{{ exec.name }}', '{{ exec.email }}', '{{ exec.role or '' }}', '{{ exec.department or '' }}', {{ exec.risk_score }}, '{{ exec.risk_level }}')" title="Editar Executivo">
-                                <i class="fas fa-edit"></i>
+                    <td data-label="Ações" class="actions">
+                        <button class="btn-action btn-edit" onclick="openEditExecutiveModal({{ exec.id }}, '{{ exec.name }}', '{{ exec.email }}', '{{ exec.role if exec.role else '' }}', '{{ exec.department if exec.department else '' }}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <form method="POST" action="{{ url_for('delete_executive', executive_id=exec.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este executivo?')">
+                            <button type="submit" class="btn-action btn-delete">
+                                <i class="fas fa-trash"></i>
                             </button>
-                            <form action="{{ url_for('delete_executive', executive_id=exec.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir este executivo e todos os itens identificados associados a ele?');">
-                                <button type="submit" class="btn-action btn-delete" title="Excluir Executivo">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </form>
-                        </div>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -83,20 +75,6 @@
                     <label for="editDepartment">Departamento:</label>
                     <input type="text" id="editDepartment" name="department">
                 </div>
-                <div class="form-group">
-                    <label for="editRiskScore">Score de Risco:</label>
-                    <input type="number" id="editRiskScore" name="risk_score" min="0" max="100" step="0.1" required>
-                </div>
-                <div class="form-group">
-                    <label for="editRiskLevel">Nível de Risco:</label>
-                    <select id="editRiskLevel" name="risk_level" required>
-                        <option value="NENHUM">NENHUM</option>
-                        <option value="BAIXO">BAIXO</option>
-                        <option value="MÉDIO">MÉDIO</option>
-                        <option value="ALTO">ALTO</option>
-                        <option value="CRÍTICO">CRÍTICO</option>
-                    </select>
-                </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-action btn-cancel" onclick="closeModal('editExecutiveModal')">
                         <i class="fas fa-times"></i> Cancelar
@@ -114,13 +92,11 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modal-handler.js') }}"></script>
     <script>
-        function openEditExecutiveModal(id, name, email, role, department, riskScore, riskLevel) {
+        function openEditExecutiveModal(id, name, email, role, department) {
             document.getElementById('editName').value = name;
             document.getElementById('editEmail').value = email;
             document.getElementById('editRole').value = role;
             document.getElementById('editDepartment').value = department;
-            document.getElementById('editRiskScore').value = riskScore;
-            document.getElementById('editRiskLevel').value = riskLevel;
             
             document.getElementById('editExecutiveForm').action = `/edit_executive/${id}`;
             openModal('editExecutiveModal');

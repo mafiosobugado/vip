@@ -51,7 +51,12 @@
                 {% for item in items %}
                 <tr data-status="{{ item.status }}" data-executive-id="{{ item.executive_id }}">
                     <td data-label="Executivo">{{ item.executive_name }}</td>
-                    <td data-label="Título">{{ item.title }}</td>
+                    <td data-label="Título">
+                        {{ item.title }}
+                        {% if item.image_filename %}
+                            <i class="fas fa-image" style="color: #007bff; margin-left: 5px;" title="Item com imagem"></i>
+                        {% endif %}
+                    </td>
                     <td data-label="Tipo">{{ item.type }}</td>
                     <td data-label="Severidade">
                         <span class="severity-tag severity-{{ item.severity | lower }}">{{ item.severity }}</span>
