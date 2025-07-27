@@ -225,7 +225,18 @@ def delete_executive(executive_id):
 def items():
     all_executives = database.get_all_executives() # Para o filtro de executivos
     all_items = database.get_all_items()
-    return render_template('items.html', items=all_items, executives=all_executives, active_page='items')
+    
+    # Converter sqlite3.Row para dict e adicionar informação sobre múltiplas imagens
+    items_list = []
+    for item in all_items:
+        # Converter Row para dict
+        item_dict = dict(item)
+        item_images = database.get_item_images(item_dict['id'])
+        item_dict['has_multiple_images'] = len(item_images) > 0
+        item_dict['total_images'] = len(item_images) + (1 if item_dict.get('image_filename') else 0)
+        items_list.append(item_dict)
+    
+    return render_template('items.html', items=items_list, executives=all_executives, active_page='items')
 
 @app.route('/add_item', methods=['GET', 'POST'])
 @login_required
@@ -265,6 +276,8 @@ def edit_item(item_id):
         return redirect(url_for('items'))
 
     executives_list = database.get_all_executives() # Para o dropdown
+    item_images = database.get_item_images(item_id) # Obter imagens múltiplas
+    
     if request.method == 'POST':
         executive_id = request.form['executive_id']
         title = request.form['title']
@@ -297,7 +310,7 @@ def edit_item(item_id):
         database.update_item(item_id, executive_id, title, description, item_type, severity, status, identified_date, image_filename)
         flash('Item atualizado com sucesso!', 'success')
         return redirect(url_for('items'))
-    return render_template('add_edit_item.html', item=item, executives=executives_list, active_page='items')
+    return render_template('add_edit_item.html', item=item, executives=executives_list, item_images=item_images, active_page='items')
 
 
 @app.route('/delete_item/<int:item_id>', methods=['POST'])
@@ -349,6 +362,102 @@ def settings():
     except Exception as e:
         print(f"Erro na rota settings: {e}")
         return render_template('settings.html', active_page='settings')
+
+# --- Rotas para imagens múltiplas ---
+@app.route('/add_item_image/<int:item_id>', methods=['POST'])
+@login_required
+def add_item_image(item_id):
+    """Adiciona uma nova imagem a um item."""
+    try:
+        if 'image' not in request.files:
+            return {'error': 'Nenhuma imagem enviada'}, 400
+        
+        file = request.files['image']
+        description = request.form.get('description', '')
+        
+        if file and file.filename != '' and allowed_file(file.filename):
+            # Gerar nome único para o arquivo
+            filename = str(uuid.uuid4()) + '.' + file.filename.rsplit('.', 1)[1].lower()
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            
+            # Salvar no banco
+            database.add_item_image(item_id, filename, description)
+            
+            return {'success': True, 'filename': filename, 'description': description}
+        else:
+            return {'error': 'Arquivo inválido'}, 400
+    except Exception as e:
+        print(f"Erro ao adicionar imagem: {e}")
+        return {'error': 'Erro interno do servidor'}, 500
+
+@app.route('/delete_item_image/<int:image_id>', methods=['DELETE'])
+@login_required
+def delete_item_image(image_id):
+    """Remove uma imagem específica."""
+    try:
+        filename = database.delete_item_image(image_id)
+        if filename:
+            # Remover arquivo físico
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return {'success': True}
+        else:
+            return {'error': 'Imagem não encontrada'}, 404
+    except Exception as e:
+        print(f"Erro ao deletar imagem: {e}")
+        return {'error': 'Erro interno do servidor'}, 500
+
+@app.route('/update_image_description/<int:image_id>', methods=['PUT'])
+@login_required
+def update_image_description(image_id):
+    """Atualiza a descrição de uma imagem."""
+    try:
+        data = request.get_json()
+        description = data.get('description', '')
+        database.update_item_image_description(image_id, description)
+        return {'success': True}
+    except Exception as e:
+        print(f"Erro ao atualizar descrição: {e}")
+        return {'error': 'Erro interno do servidor'}, 500
+
+@app.route('/get_item_images/<int:item_id>')
+@login_required
+def get_item_images_api(item_id):
+    """Retorna todas as imagens de um item em formato JSON."""
+    try:
+        item = database.get_item_by_id(item_id)
+        if not item:
+            return {'error': 'Item não encontrado'}, 404
+        
+        images = []
+        
+        # Adicionar imagem principal se existir
+        if item.get('image_filename'):
+            images.append({
+                'id': 'main',
+                'filename': item['image_filename'],
+                'description': 'Imagem principal',
+                'url': url_for('static', filename='uploads/' + item['image_filename']),
+                'is_main': True
+            })
+        
+        # Adicionar imagens múltiplas
+        item_images = database.get_item_images(item_id)
+        for img in item_images:
+            images.append({
+                'id': img['id'],
+                'filename': img['filename'],
+                'description': img['description'] or 'Sem descrição',
+                'url': url_for('static', filename='uploads/' + img['filename']),
+                'is_main': False
+            })
+        
+        return {'images': images, 'total': len(images)}
+    except Exception as e:
+        print(f"Erro ao buscar imagens: {e}")
+        return {'error': 'Erro interno do servidor'}, 500
 
 # --- Inicialização do banco de dados ---
 try:

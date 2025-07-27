@@ -28,20 +28,57 @@
             
             <!-- Campo de Imagem -->
             <div class="form-group">
-                <label for="image">Imagem (Opcional):</label>
+                <label for="image">Imagem Principal (Opcional):</label>
                 <input type="file" id="image" name="image" accept=".jpg,.jpeg,.png" onchange="previewImage(this)">
                 <small style="color: #888; font-size: 0.9em;">Formatos suportados: JPG, JPEG, PNG (máximo 5MB)</small>
                 {% if item and item.image_filename %}
                     <div style="margin-top: 10px;">
-                        <p><strong>Imagem atual:</strong></p>
-                        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Imagem atual" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;">
+                        <p><strong>Imagem principal atual:</strong> <small style="color: #007bff; cursor: pointer;" onclick="openImageModal()">Clique para visualizar/editar</small></p>
+                        <img id="currentImage" src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Imagem atual" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;" onclick="openImageModal()">
                     </div>
                 {% endif %}
                 <div id="imagePreview" style="margin-top: 10px; display: none;">
-                    <p><strong>Nova imagem:</strong></p>
-                    <img id="previewImg" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p><strong>Nova imagem principal:</strong> <small style="color: #007bff; cursor: pointer;" onclick="openImageModal()">Clique para visualizar/editar</small></p>
+                    <img id="previewImg" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;" onclick="openImageModal()">
                 </div>
             </div>
+
+            <!-- Seção de Imagens Múltiplas (apenas para edição) -->
+            {% if item %}
+            <div class="form-group">
+                <label>Galeria de Imagens:</label>
+                <div id="imageGallery" style="margin-top: 10px;">
+                    {% if item_images %}
+                        {% for img in item_images %}
+                        <div class="image-item" data-image-id="{{ img.id }}" style="display: inline-block; margin: 10px; position: relative; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: #f9f9f9;">
+                            <img src="{{ url_for('static', filename='uploads/' + img.filename) }}" 
+                                 alt="Imagem do item" 
+                                 style="max-width: 150px; max-height: 150px; display: block; cursor: pointer;"
+                                 data-filename="{{ img.filename }}"
+                                 data-description="{{ img.description or '' }}"
+                                 data-image-id="{{ img.id }}"
+                                 onclick="openGalleryModalWithData(this)">
+                            <div style="margin-top: 5px; text-align: center;">
+                                <small style="color: #666;">{{ img.description or 'Sem descrição' }}</small>
+                            </div>
+                            <button type="button" 
+                                    onclick="deleteImage({{ img.id }})" 
+                                    style="position: absolute; top: 5px; right: 5px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-size: 12px;">
+                                
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: #666; font-style: italic;">Nenhuma imagem adicional</p>
+                    {% endif %}
+                </div>
+                <div style="margin-top: 15px;">
+                    <button type="button" onclick="openAddImageModal()" style="background-color: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        + Adicionar Nova Imagem
+                    </button>
+                </div>
+            </div>
+            {% endif %}
             
             <div class="form-group">
                 <label for="type">Tipo:</label>
@@ -82,10 +119,79 @@
             <a href="{{ url_for('items') }}" class="btn-secondary">Cancelar</a>
         </form>
     </div>
+
+    <!-- Modal para visualizar/editar imagem -->
+    <div id="imageModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="position: relative; margin: 5% auto; padding: 20px; width: 90%; max-width: 600px; background-color: white; border-radius: 8px;">
+            <span onclick="closeImageModal()" style="position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #999;">&times;</span>
+            <h3 id="modalTitle">Visualizar/Editar Imagem</h3>
+            <div id="imageContainer" style="text-align: center; margin: 20px 0;">
+                <img id="modalImage" style="max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px; display: none;">
+                <div id="noImageText" style="display: none; padding: 40px; color: #666; font-size: 18px;">
+                    📷 Nenhuma imagem selecionada
+                </div>
+            </div>
+            <div style="margin: 20px 0;">
+                <label for="modalImageInput" id="modalInputLabel">Selecionar imagem:</label>
+                <input type="file" id="modalImageInput" accept=".jpg,.jpeg,.png" onchange="previewModalImage(this)" style="width: 100%; margin-top: 5px;">
+                <small style="color: #888; font-size: 0.9em;">Formatos suportados: JPG, JPEG, PNG (máximo 5MB)</small>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button type="button" onclick="applyImageChange()" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 10px;">Aplicar</button>
+                <button type="button" onclick="closeImageModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para adicionar nova imagem à galeria -->
+    <div id="addImageModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="position: relative; margin: 5% auto; padding: 20px; width: 90%; max-width: 600px; background-color: white; border-radius: 8px;">
+            <span onclick="closeAddImageModal()" style="position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #999;">&times;</span>
+            <h3>Adicionar Nova Imagem</h3>
+            <div style="margin: 20px 0;">
+                <label for="newImageInput">Selecionar imagem:</label>
+                <input type="file" id="newImageInput" accept=".jpg,.jpeg,.png" onchange="previewNewImage(this)" style="width: 100%; margin-top: 5px;">
+                <small style="color: #888; font-size: 0.9em;">Formatos suportados: JPG, JPEG, PNG (máximo 5MB)</small>
+            </div>
+            <div style="margin: 20px 0;">
+                <label for="newImageDescription">Descrição (opcional):</label>
+                <textarea id="newImageDescription" placeholder="Descrição da imagem..." style="width: 100%; margin-top: 5px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" rows="3"></textarea>
+            </div>
+            <div id="newImagePreview" style="text-align: center; margin: 20px 0; display: none;">
+                <img id="newImagePreviewImg" style="max-width: 100%; max-height: 300px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button type="button" onclick="addNewImage()" style="background-color: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 10px;">Adicionar</button>
+                <button type="button" onclick="closeAddImageModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para visualizar imagem da galeria -->
+    <div id="galleryModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="position: relative; margin: 2% auto; padding: 20px; width: 95%; max-width: 800px; background-color: white; border-radius: 8px;">
+            <span onclick="closeGalleryModal()" style="position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #999;">&times;</span>
+            <h3>Visualizar Imagem</h3>
+            <div style="text-align: center; margin: 20px 0;">
+                <img id="galleryModalImage" style="max-width: 100%; max-height: 500px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin: 20px 0;">
+                <label for="galleryImageDescription">Descrição:</label>
+                <textarea id="galleryImageDescription" style="width: 100%; margin-top: 5px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" rows="3"></textarea>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button type="button" onclick="updateImageDescription()" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 10px;">Salvar Descrição</button>
+                <button type="button" onclick="closeGalleryModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Fechar</button>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let modalImageFile = null;
+let currentGalleryImageId = null;
+
 function previewImage(input) {
     const preview = document.getElementById('imagePreview');
     const previewImg = document.getElementById('previewImg');
@@ -118,6 +224,279 @@ function previewImage(input) {
         reader.readAsDataURL(file);
     } else {
         preview.style.display = 'none';
+    }
+}
+
+function openImageModal() {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalInputLabel = document.getElementById('modalInputLabel');
+    const noImageText = document.getElementById('noImageText');
+    const currentImage = document.getElementById('currentImage');
+    const previewImg = document.getElementById('previewImg');
+    const imagePreview = document.getElementById('imagePreview');
+    
+    // Limpar o campo de input do modal
+    document.getElementById('modalImageInput').value = '';
+    modalImageFile = null;
+    
+    // Determinar qual imagem mostrar no modal
+    if (imagePreview && imagePreview.style.display !== 'none' && previewImg && previewImg.src && previewImg.src !== '') {
+        modalImage.src = previewImg.src;
+        modalImage.style.display = 'block';
+        noImageText.style.display = 'none';
+        modalTitle.textContent = 'Visualizar/Editar Imagem';
+        modalInputLabel.textContent = 'Substituir imagem:';
+    } else if (currentImage && currentImage.src && currentImage.src !== '') {
+        modalImage.src = currentImage.src;
+        modalImage.style.display = 'block';
+        noImageText.style.display = 'none';
+        modalTitle.textContent = 'Visualizar/Editar Imagem';
+        modalInputLabel.textContent = 'Substituir imagem:';
+    } else {
+        modalImage.style.display = 'none';
+        noImageText.style.display = 'block';
+        modalTitle.textContent = 'Adicionar Imagem';
+        modalInputLabel.textContent = 'Selecionar imagem:';
+    }
+    
+    modal.style.display = 'block';
+}
+
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    modal.style.display = 'none';
+    modalImageFile = null;
+    document.getElementById('modalImageInput').value = '';
+}
+
+function previewModalImage(input) {
+    const modalImage = document.getElementById('modalImage');
+    const noImageText = document.getElementById('noImageText');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalInputLabel = document.getElementById('modalInputLabel');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Verificar tamanho (máx. 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Arquivo muito grande! O tamanho máximo é 5MB.');
+            input.value = '';
+            return;
+        }
+        
+        // Verificar tipo
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Formato de arquivo não suportado! Use JPG, JPEG ou PNG.');
+            input.value = '';
+            return;
+        }
+        
+        modalImageFile = file;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            modalImage.src = e.target.result;
+            modalImage.style.display = 'block';
+            noImageText.style.display = 'none';
+            modalTitle.textContent = 'Visualizar/Editar Imagem';
+            modalInputLabel.textContent = 'Substituir imagem:';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function applyImageChange() {
+    if (modalImageFile) {
+        const mainImageInput = document.getElementById('image');
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(modalImageFile);
+        mainImageInput.files = dataTransfer.files;
+        
+        // Atualizar preview principal
+        previewImage(mainImageInput);
+    }
+    closeImageModal();
+}
+
+// Funções para galeria de imagens múltiplas
+function openAddImageModal() {
+    const modal = document.getElementById('addImageModal');
+    document.getElementById('newImageInput').value = '';
+    document.getElementById('newImageDescription').value = '';
+    document.getElementById('newImagePreview').style.display = 'none';
+    modal.style.display = 'block';
+}
+
+function closeAddImageModal() {
+    const modal = document.getElementById('addImageModal');
+    modal.style.display = 'none';
+}
+
+function previewNewImage(input) {
+    const preview = document.getElementById('newImagePreview');
+    const previewImg = document.getElementById('newImagePreviewImg');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Verificar tamanho (máx. 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Arquivo muito grande! O tamanho máximo é 5MB.');
+            input.value = '';
+            preview.style.display = 'none';
+            return;
+        }
+        
+        // Verificar tipo
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Formato de arquivo não suportado! Use JPG, JPEG ou PNG.');
+            input.value = '';
+            preview.style.display = 'none';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+function addNewImage() {
+    const fileInput = document.getElementById('newImageInput');
+    const description = document.getElementById('newImageDescription').value;
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Por favor, selecione uma imagem.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('image', fileInput.files[0]);
+    formData.append('description', description);
+    
+    // Obter o ID do item da URL
+    const urlParts = window.location.pathname.split('/');
+    const itemId = urlParts[urlParts.length - 1];
+    
+    fetch(`/add_item_image/${itemId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Recarregar a página para mostrar a nova imagem
+        } else {
+            alert('Erro ao adicionar imagem: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao adicionar imagem.');
+    });
+}
+
+function deleteImage(imageId) {
+    if (!confirm('Tem certeza que deseja excluir esta imagem?')) {
+        return;
+    }
+    
+    fetch(`/delete_item_image/${imageId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remover o elemento da galeria
+            const imageElement = document.querySelector(`[data-image-id="${imageId}"]`);
+            if (imageElement) {
+                imageElement.remove();
+            }
+        } else {
+            alert('Erro ao excluir imagem: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao excluir imagem.');
+    });
+}
+
+function openGalleryModal(filename, description, imageId) {
+    const modal = document.getElementById('galleryModal');
+    const modalImage = document.getElementById('galleryModalImage');
+    const descriptionTextarea = document.getElementById('galleryImageDescription');
+    
+    modalImage.src = `/static/uploads/${filename}`;
+    descriptionTextarea.value = description;
+    currentGalleryImageId = imageId;
+    
+    modal.style.display = 'block';
+}
+
+function openGalleryModalWithData(element) {
+    const filename = element.getAttribute('data-filename');
+    const description = element.getAttribute('data-description');
+    const imageId = element.getAttribute('data-image-id');
+    
+    openGalleryModal(filename, description, imageId);
+}
+
+function closeGalleryModal() {
+    const modal = document.getElementById('galleryModal');
+    modal.style.display = 'none';
+    currentGalleryImageId = null;
+}
+
+function updateImageDescription() {
+    if (!currentGalleryImageId) return;
+    
+    const description = document.getElementById('galleryImageDescription').value;
+    
+    fetch(`/update_image_description/${currentGalleryImageId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ description: description })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Descrição atualizada com sucesso!');
+            location.reload(); // Recarregar para mostrar a descrição atualizada
+        } else {
+            alert('Erro ao atualizar descrição: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao atualizar descrição.');
+    });
+}
+
+// Fechar modais ao clicar fora deles
+window.onclick = function(event) {
+    const imageModal = document.getElementById('imageModal');
+    const addImageModal = document.getElementById('addImageModal');
+    const galleryModal = document.getElementById('galleryModal');
+    
+    if (event.target === imageModal) {
+        closeImageModal();
+    } else if (event.target === addImageModal) {
+        closeAddImageModal();
+    } else if (event.target === galleryModal) {
+        closeGalleryModal();
     }
 }
 </script>

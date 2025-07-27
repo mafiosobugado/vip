@@ -46,8 +46,20 @@ def init_db():
             severity TEXT NOT NULL, -- Ex: BAIXA, MEDIA, ALTA, CRITICA
             status TEXT NOT NULL, -- Ex: PENDENTE, TRATADO, IGNORADO
             identified_date TEXT NOT NULL, -- Data no formato YYYY-MM-DD
-            image_filename TEXT, -- Nome do arquivo de imagem (opcional)
+            image_filename TEXT, -- Nome do arquivo de imagem (opcional) - mantido para compatibilidade
             FOREIGN KEY (executive_id) REFERENCES executives (id) ON DELETE CASCADE
+        );
+    ''')
+
+    # Tabela de Imagens dos Itens (múltiplas imagens por item)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS item_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            description TEXT,
+            upload_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
         );
     ''')
 
@@ -290,3 +302,39 @@ def get_identified_items_trend_data(num_weeks=8):
 
     conn.close()
     return {'dates': dates, 'counts': counts}
+
+# --- Funções para imagens múltiplas ---
+def add_item_image(item_id, filename, description=None):
+    """Adiciona uma imagem a um item."""
+    conn = get_db_connection()
+    conn.execute('INSERT INTO item_images (item_id, filename, description, upload_date) VALUES (?, ?, ?, ?)',
+                 (item_id, filename, description, datetime.datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_item_images(item_id):
+    """Obtém todas as imagens de um item."""
+    conn = get_db_connection()
+    images = conn.execute('SELECT * FROM item_images WHERE item_id = ? ORDER BY upload_date', (item_id,)).fetchall()
+    conn.close()
+    return images
+
+def delete_item_image(image_id):
+    """Remove uma imagem específica."""
+    conn = get_db_connection()
+    # Primeiro obtém o nome do arquivo para deletar fisicamente
+    image = conn.execute('SELECT filename FROM item_images WHERE id = ?', (image_id,)).fetchone()
+    if image:
+        conn.execute('DELETE FROM item_images WHERE id = ?', (image_id,))
+        conn.commit()
+        conn.close()
+        return image['filename']
+    conn.close()
+    return None
+
+def update_item_image_description(image_id, description):
+    """Atualiza a descrição de uma imagem."""
+    conn = get_db_connection()
+    conn.execute('UPDATE item_images SET description = ? WHERE id = ?', (description, image_id))
+    conn.commit()
+    conn.close()

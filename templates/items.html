@@ -54,7 +54,15 @@
                     <td data-label="Título">
                         {{ item.title }}
                         {% if item.image_filename %}
-                            <i class="fas fa-image" style="color: #007bff; margin-left: 5px;" title="Item com imagem"></i>
+                            <span style="margin-left: 5px;">
+                                <i class="fas fa-image" 
+                                   style="color: #007bff; cursor: pointer;" 
+                                   title="Clique para visualizar imagem"
+                                   data-item-id="{{ item.id }}"
+                                   data-main-image="{{ url_for('static', filename='uploads/' + item.image_filename) }}"
+                                   data-image-title="{{ item.title }}"
+                                   onclick="testImageClick(this);"></i>
+                            </span>
                         {% endif %}
                     </td>
                     <td data-label="Tipo">{{ item.type }}</td>
@@ -204,7 +212,146 @@
             document.getElementById('editItemForm').action = `/edit_item/${id}`;
             openModal('editItemModal');
         }
+
+        // Função para visualizar imagem ao clicar no ícone
+        function testImageClick(element) {
+            const imageUrl = element.getAttribute('data-main-image');
+            const title = element.getAttribute('data-image-title');
+            openImagePreviewModal(imageUrl, title);
+        }
+
+        // Funções para visualizar imagem
+        function openImagePreviewModal(imageUrl, title) {
+            const modal = document.getElementById('imagePreviewModal');
+            const modalImage = document.getElementById('imagePreviewImg');
+            const modalTitle = document.getElementById('imagePreviewTitle');
+            
+            modalImage.src = imageUrl;
+            modalTitle.textContent = `Imagem: ${title}`;
+            modal.style.display = 'block';
+        }
+
+        function openImagePreviewModalFromData(element) {
+            const imageUrl = element.getAttribute('data-image-url');
+            const imageTitle = element.getAttribute('data-image-title');
+            openImagePreviewModal(imageUrl, imageTitle);
+        }
+
+        async function openItemImagesModal(element) {
+            console.log('openItemImagesModal chamada!'); // Debug
+            const itemId = element.getAttribute('data-item-id');
+            const title = element.getAttribute('data-image-title');
+            
+            console.log('Item ID:', itemId, 'Title:', title); // Debug
+            
+            try {
+                const response = await fetch(`/get_item_images/${itemId}`);
+                const data = await response.json();
+                
+                console.log('Dados recebidos:', data); // Debug
+                
+                if (data.error) {
+                    alert('Erro ao carregar imagens: ' + data.error);
+                    return;
+                }
+                
+                if (data.images.length === 1) {
+                    // Se há apenas uma imagem, abrir diretamente
+                    openImagePreviewModal(data.images[0].url, title);
+                } else if (data.images.length > 1) {
+                    // Se há múltiplas imagens, abrir galeria
+                    openImageGalleryModal(data.images, title);
+                } else {
+                    alert('Nenhuma imagem encontrada.');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar imagens.');
+            }
+        }
+
+        function openImageGalleryModal(images, title) {
+            const modal = document.getElementById('imageGalleryModal');
+            const modalTitle = document.getElementById('imageGalleryTitle');
+            const galleryContainer = document.getElementById('imageGalleryContainer');
+            
+            modalTitle.textContent = `Imagens: ${title}`;
+            galleryContainer.innerHTML = '';
+            
+            images.forEach((image, index) => {
+                const imageDiv = document.createElement('div');
+                imageDiv.style.cssText = 'display: inline-block; margin: 10px; text-align: center; cursor: pointer;';
+                imageDiv.onclick = () => openImagePreviewModal(image.url, `${title} - ${image.description}`);
+                
+                const img = document.createElement('img');
+                img.src = image.url;
+                img.style.cssText = 'max-width: 200px; max-height: 200px; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.3s;';
+                img.onmouseover = () => img.style.borderColor = '#007bff';
+                img.onmouseout = () => img.style.borderColor = '#ddd';
+                
+                const desc = document.createElement('div');
+                desc.style.cssText = 'margin-top: 5px; font-size: 12px; color: #666; max-width: 200px; word-wrap: break-word;';
+                desc.textContent = image.description;
+                
+                imageDiv.appendChild(img);
+                imageDiv.appendChild(desc);
+                galleryContainer.appendChild(imageDiv);
+            });
+            
+            modal.style.display = 'block';
+        }
+
+        function closeImagePreviewModal() {
+            const modal = document.getElementById('imagePreviewModal');
+            modal.style.display = 'none';
+        }
+
+        function closeImageGalleryModal() {
+            const modal = document.getElementById('imageGalleryModal');
+            modal.style.display = 'none';
+        }
+
+        // Fechar modal ao clicar fora dele
+        window.addEventListener('click', function(event) {
+            const imageModal = document.getElementById('imagePreviewModal');
+            const galleryModal = document.getElementById('imageGalleryModal');
+            
+            if (event.target === imageModal) {
+                closeImagePreviewModal();
+            } else if (event.target === galleryModal) {
+                closeImageGalleryModal();
+            }
+        });
     </script>
+
+    <!-- Modal para visualizar imagem única -->
+    <div id="imagePreviewModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="position: relative; margin: 2% auto; padding: 20px; width: 95%; max-width: 900px; background-color: white; border-radius: 8px; text-align: center;">
+            <span onclick="closeImagePreviewModal()" style="position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #999;">&times;</span>
+            <h3 id="imagePreviewTitle">Visualizar Imagem</h3>
+            <div style="margin: 20px 0;">
+                <img id="imagePreviewImg" style="max-width: 100%; max-height: 70vh; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button type="button" onclick="closeImagePreviewModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para galeria de imagens múltiplas -->
+    <div id="imageGalleryModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="position: relative; margin: 1% auto; padding: 20px; width: 98%; max-width: 1200px; background-color: white; border-radius: 8px;">
+            <span onclick="closeImageGalleryModal()" style="position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #999;">&times;</span>
+            <h3 id="imageGalleryTitle">Galeria de Imagens</h3>
+            <div id="imageGalleryContainer" style="margin: 20px 0; text-align: center; max-height: 70vh; overflow-y: auto;">
+                <!-- Imagens serão inseridas aqui dinamicamente -->
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="color: #666; font-size: 14px;">Clique em qualquer imagem para visualizar em tamanho completo</p>
+                <button type="button" onclick="closeImageGalleryModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Fechar</button>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
