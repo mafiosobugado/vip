@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria{% endblock %}
+
+{% block page_title %}Auditoria{% endblock %}
+
+{% block content %}
+<div class="audit-container">
+    <div class="audit-header">
+        <h2>Auditoria</h2>
+        <p class="audit-subtitle">Histórico de alterações no sistema</p>
+    </div>
+
+    <div class="audit-actions">
+        <button class="btn-sample" onclick="createSampleLogs()">
+            <i class="fas fa-plus"></i>
+            Criar Dados de Exemplo
+        </button>
+    </div>
+
+    <div class="audit-table-container">
+        <table class="audit-table">
+            <thead>
+                <tr>
+                    <th>DATA/HORA</th>
+                    <th>USUÁRIO</th>
+                    <th>AÇÃO</th>
+                    <th>DETALHES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if audit_logs %}
+                    {% for log in audit_logs %}
+                    <tr>
+                        <td class="audit-timestamp">{{ log.timestamp }}</td>
+                        <td class="audit-user">{{ log.user }}</td>
+                        <td class="audit-action">{{ log.action }}</td>
+                        <td class="audit-details">{{ log.details }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="no-data">
+                            <div class="no-data-content">
+                                <i class="fas fa-history"></i>
+                                <p>Nenhum registro de auditoria encontrado</p>
+                                <button class="btn-sample" onclick="createSampleLogs()">
+                                    Criar Dados de Exemplo
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function createSampleLogs() {
+    if (confirm('Deseja criar dados de exemplo para a auditoria?')) {
+        fetch('/create_sample_audit_logs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao criar dados de exemplo');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao criar dados de exemplo');
+        });
+    }
+}
+</script>
+{% endblock %}

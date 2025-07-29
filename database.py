@@ -63,6 +63,36 @@ def init_db():
         );
     ''')
 
+    # Tabela de Alertas
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            type TEXT NOT NULL, -- CRITICO, AVISO, INFO
+            related_item_id INTEGER,
+            related_executive_id INTEGER,
+            is_read BOOLEAN DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (related_item_id) REFERENCES items (id) ON DELETE SET NULL,
+            FOREIGN KEY (related_executive_id) REFERENCES executives (id) ON DELETE SET NULL
+        );
+    ''')
+
+    # Tabela de Auditoria
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            user TEXT NOT NULL,
+            action TEXT NOT NULL,
+            details TEXT NOT NULL,
+            related_table TEXT,
+            related_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+    ''')
+
     conn.commit()
     
     # Adicionar coluna image_filename se não existir (para compatibilidade com bancos existentes)
@@ -338,3 +368,113 @@ def update_item_image_description(image_id, description):
     conn.execute('UPDATE item_images SET description = ? WHERE id = ?', (description, image_id))
     conn.commit()
     conn.close()
+
+# --- Funções para ALERTAS ---
+
+def add_alert(title, description, alert_type, related_item_id=None, related_executive_id=None):
+    """Adiciona um novo alerta."""
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO alerts (title, description, type, related_item_id, related_executive_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (title, description, alert_type, related_item_id, related_executive_id, datetime.datetime.now().strftime('%d/%m/%Y, %H:%M:%S')))
+    conn.commit()
+    conn.close()
+
+def get_all_alerts():
+    """Obtém todos os alertas ordenados por data de criação (mais recentes primeiro)."""
+    conn = get_db_connection()
+    alerts = conn.execute('''
+        SELECT a.*, e.name as executive_name, i.title as item_title
+        FROM alerts a
+        LEFT JOIN executives e ON a.related_executive_id = e.id
+        LEFT JOIN items i ON a.related_item_id = i.id
+        ORDER BY a.created_at DESC
+    ''').fetchall()
+    conn.close()
+    return alerts
+
+def get_recent_alerts(limit=5):
+    """Obtém os alertas mais recentes para o dropdown de notificações."""
+    conn = get_db_connection()
+    alerts = conn.execute('''
+        SELECT a.*, e.name as executive_name, i.title as item_title
+        FROM alerts a
+        LEFT JOIN executives e ON a.related_executive_id = e.id
+        LEFT JOIN items i ON a.related_item_id = i.id
+        ORDER BY a.created_at DESC
+        LIMIT ?
+    ''', (limit,)).fetchall()
+    conn.close()
+    return [dict(alert) for alert in alerts]
+
+def get_unread_alerts_count():
+    """Conta alertas não lidos."""
+    conn = get_db_connection()
+    count = conn.execute('SELECT COUNT(*) as count FROM alerts WHERE is_read = 0').fetchone()
+    conn.close()
+    return count['count'] if count else 0
+
+def mark_alert_as_read(alert_id):
+    """Marca um alerta como lido."""
+    conn = get_db_connection()
+    conn.execute('UPDATE alerts SET is_read = 1 WHERE id = ?', (alert_id,))
+    conn.commit()
+    conn.close()
+
+def delete_alert(alert_id):
+    """Remove um alerta."""
+    conn = get_db_connection()
+    conn.execute('DELETE FROM alerts WHERE id = ?', (alert_id,))
+    conn.commit()
+    conn.close()
+
+# --- Funções para AUDITORIA ---
+
+def add_audit_log(user, action, details, related_table=None, related_id=None):
+    """Adiciona um registro de auditoria."""
+    conn = get_db_connection()
+    timestamp = datetime.datetime.now().strftime('%d/%m/%Y, %H:%M:%S')
+    conn.execute('''
+        INSERT INTO audit_log (timestamp, user, action, details, related_table, related_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (timestamp, user, action, details, related_table, related_id))
+    conn.commit()
+    conn.close()
+
+def get_all_audit_logs():
+    """Obtém todos os logs de auditoria ordenados por data (mais recentes primeiro)."""
+    conn = get_db_connection()
+    logs = conn.execute('''
+        SELECT * FROM audit_log
+        ORDER BY created_at DESC
+    ''').fetchall()
+    conn.close()
+    return logs
+
+def create_sample_audit_logs():
+    """Cria alguns logs de auditoria de exemplo para demonstração."""
+    try:
+        # Simular algumas ações do sistema
+        add_audit_log('Analista', 'Criou item identificado', 'Credencial encontrada para Carlos Andrade', 'items', 1)
+        add_audit_log('Sistema', 'Atualizou score de risco', 'Score de Carlos Andrade alterado para 9.5', 'executives', 1)
+        add_audit_log('Analista', 'Marcou item como tratado', 'Telefone de Carlos Andrade - ID: 3', 'items', 3)
+        add_audit_log('Analista', 'Criou item identificado', 'Email de Beatriz Lima adicionado', 'items', 2)
+        add_audit_log('Sistema', 'Detectou nova exposição', 'Endereço de Sofia Costa encontrado', 'items', 4)
+        return True
+    except Exception as e:
+        print(f"Erro ao criar logs de auditoria de exemplo: {e}")
+        return False
+
+def create_sample_alerts():
+    """Cria alertas de exemplo para demonstração."""
+    sample_alerts = [
+        ("Nova credencial encontrada", "Credencial de Carlos Andrade encontrada em breach recente", "CRITICO", None, None),
+        ("Score de risco aumentou", "Score de risco de Carlos Andrade aumentou para 9.5", "AVISO", None, None),
+        ("Item tratado com sucesso", "Telefone de Carlos Andrade foi marcado como tratado", "INFO", None, None),
+        ("Sistema atualizado", "Sistema VIP Monitoring foi atualizado para versão 2.1", "INFO", None, None),
+        ("Novo executivo adicionado", "Maria Silva foi adicionada ao sistema de monitoramento", "INFO", None, None)
+    ]
+    
+    for title, description, alert_type, item_id, exec_id in sample_alerts:
+        add_alert(title, description, alert_type, item_id, exec_id)

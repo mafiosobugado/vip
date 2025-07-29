@@ -1,8 +1,142 @@
 {% extends "base.html" %}
 
-{% block title %}Relatórios - Meu App{% endblock %}
+{% block title %}Relatórios{% endblock %}
+
+{% block page_title %}Relatórios{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4 text-gray-800">Relatórios</h1>
-<p>Conteúdo da página de relatórios virá aqui...</p>
+<div class="reports-container">
+    <div class="reports-header">
+        <h2>Relatórios</h2>
+        <p class="reports-subtitle">Geração e exportação de relatórios</p>
+    </div>
+
+    <div class="reports-grid">
+        <!-- Relatório de Executivos -->
+        <div class="report-card">
+            <div class="report-card-header">
+                <h3>Relatório de Executivos</h3>
+                <p>Exportar dados completos dos executivos monitorados</p>
+            </div>
+            <div class="report-card-actions">
+                <button class="btn-export" onclick="exportReport('executives')">
+                    <i class="fas fa-download"></i>
+                    Exportar CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Relatório de Itens -->
+        <div class="report-card">
+            <div class="report-card-header">
+                <h3>Relatório de Itens</h3>
+                <p>Exportar itens identificados com filtros aplicados</p>
+            </div>
+            <div class="report-card-actions">
+                <button class="btn-export" onclick="exportReport('items')">
+                    <i class="fas fa-download"></i>
+                    Exportar CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Relatório de Auditoria -->
+        <div class="report-card">
+            <div class="report-card-header">
+                <h3>Relatório de Auditoria</h3>
+                <p>Histórico completo de alterações no sistema</p>
+            </div>
+            <div class="report-card-actions">
+                <button class="btn-export" onclick="exportReport('audit')">
+                    <i class="fas fa-download"></i>
+                    Exportar CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas dos Relatórios -->
+    <div class="reports-stats">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number">{{ total_executives }}</span>
+                    <span class="stat-label">Executivos</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number">{{ total_items }}</span>
+                    <span class="stat-label">Itens Identificados</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number">{{ total_audit_logs }}</span>
+                    <span class="stat-label">Logs de Auditoria</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportReport(type) {
+    // Mostrar loading no botão
+    const buttons = document.querySelectorAll('.btn-export');
+    buttons.forEach(btn => {
+        if (btn.onclick.toString().includes(type)) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportando...';
+            btn.disabled = true;
+        }
+    });
+
+    // Fazer a requisição de exportação
+    fetch(`/export_report/${type}`, {
+        method: 'GET',
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.blob();
+        }
+        throw new Error('Erro ao exportar relatório');
+    })
+    .then(blob => {
+        // Criar link de download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `relatorio_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        // Mostrar sucesso
+        alert('Relatório exportado com sucesso!');
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao exportar relatório. Tente novamente.');
+    })
+    .finally(() => {
+        // Restaurar botões
+        buttons.forEach(btn => {
+            if (btn.onclick.toString().includes(type)) {
+                btn.innerHTML = '<i class="fas fa-download"></i> Exportar CSV';
+                btn.disabled = false;
+            }
+        });
+    });
+}
+</script>
 {% endblock %}

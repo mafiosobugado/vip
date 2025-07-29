@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -22,6 +22,15 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Função helper para logging de auditoria
+def log_user_action(action, details, related_table=None, related_id=None):
+    """Registra uma ação do usuário no log de auditoria."""
+    try:
+        username = current_user.username if current_user.is_authenticated else 'Sistema'
+        database.add_audit_log(username, action, details, related_table, related_id)
+    except Exception as e:
+        print(f"Erro ao registrar log de auditoria: {e}")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -62,9 +71,11 @@ def login():
 
             if user and check_password_hash(user.password, password):
                 login_user(user, remember=True) # remember=True cria uma sessão permanente
+                log_user_action('Login realizado', f'Usuário {username} fez login no sistema')
                 flash('Login bem-sucedido!', 'success')
                 return redirect(url_for('dashboard'))
             else:
+                log_user_action('Tentativa de login falhada', f'Tentativa de login falhada para usuário: {username}')
                 flash('Nome de usuário ou senha inválidos.', 'danger')
         return render_template('login.html')
     except Exception as e:
@@ -108,6 +119,8 @@ def register():
 @login_required
 def logout():
     try:
+        username = current_user.username if current_user.is_authenticated else 'Usuário desconhecido'
+        log_user_action('Logout realizado', f'Usuário {username} fez logout do sistema')
         logout_user()
         flash('Você foi desconectado.', 'info')
         return redirect(url_for('login'))
@@ -180,9 +193,20 @@ def add_executive():
         risk_level = 'NENHUM'
 
         if database.add_executive(name, email, role, department, risk_score, risk_level):
+            # Registrar log de auditoria
+            log_user_action('Executivo criado', f'Executivo {name} ({email}) adicionado ao sistema', 'executives')
+            
+            # Criar alerta de novo executivo
+            database.add_alert(
+                "👤 Novo executivo adicionado",
+                f"Executivo '{name}' foi adicionado ao sistema. Cargo: {role or 'Não informado'}, Departamento: {department or 'Não informado'}",
+                "INFO"
+            )
+            
             flash('Executivo adicionado com sucesso!', 'success')
             return redirect(url_for('executives'))
         else:
+            log_user_action('Falha ao criar executivo', f'Tentativa de adicionar executivo {name} ({email}) falhou - email já existe')
             flash('Erro: Já existe um executivo com este e-mail.', 'danger')
     return render_template('add_edit_executive.html', executive=None, active_page='executives')
 
@@ -205,9 +229,11 @@ def edit_executive(executive_id):
         risk_level = executive['risk_level']
 
         if database.update_executive(executive_id, name, email, role, department, risk_score, risk_level):
+            log_user_action('Executivo atualizado', f'Executivo {name} (ID: {executive_id}) foi atualizado', 'executives', executive_id)
             flash('Executivo atualizado com sucesso!', 'success')
             return redirect(url_for('executives'))
         else:
+            log_user_action('Falha ao atualizar executivo', f'Tentativa de atualizar executivo {name} (ID: {executive_id}) falhou - email já existe')
             flash('Erro: Já existe outro executivo com este e-mail.', 'danger')
             return render_template('add_edit_executive.html', executive=executive, active_page='executives') # Renderiza com os dados originais
     return render_template('add_edit_executive.html', executive=executive, active_page='executives')
@@ -215,7 +241,12 @@ def edit_executive(executive_id):
 @app.route('/delete_executive/<int:executive_id>', methods=['POST'])
 @login_required
 def delete_executive(executive_id):
+    # Obter dados do executivo antes de excluir para o log
+    executive = database.get_executive_by_id(executive_id)
+    executive_name = executive['name'] if executive else f'ID: {executive_id}'
+    
     database.delete_executive(executive_id)
+    log_user_action('Executivo excluído', f'Executivo {executive_name} foi excluído do sistema', 'executives', executive_id)
     flash('Executivo excluído com sucesso!', 'success')
     return redirect(url_for('executives'))
 
@@ -263,6 +294,50 @@ def add_item():
                 image_filename = filename
 
         database.add_item(executive_id, title, description, item_type, severity, status, identified_date, image_filename)
+        
+        # Registrar log de auditoria
+        executive = database.get_executive_by_id(executive_id)
+        executive_name = executive['name'] if executive else f'ID: {executive_id}'
+        log_user_action('Item criado', f'Item "{title}" ({item_type}, {severity}) criado para {executive_name}', 'items')
+        
+        # Criar alertas automáticos baseados na severidade e tipo
+        
+        if severity == 'CRITICA':
+            database.add_alert(
+                "🚨 Novo item CRÍTICO identificado",
+                f"Item '{title}' de severidade CRÍTICA foi identificado para {executive_name}. Tipo: {item_type}. Requer ação imediata!",
+                "CRITICO",
+                None,
+                executive_id
+            )
+        elif severity == 'ALTA':
+            database.add_alert(
+                "⚠️ Item de alta severidade identificado",
+                f"Item '{title}' de severidade ALTA foi identificado para {executive_name}. Tipo: {item_type}.",
+                "AVISO",
+                None,
+                executive_id
+            )
+        
+        # Alerta para tipos específicos sensíveis
+        if item_type in ['CREDENTIAL', 'DOCUMENTO']:
+            database.add_alert(
+                f"🔐 {item_type} sensível identificado",
+                f"Novo {item_type.lower()} '{title}' foi identificado para {executive_name}. Verificar segurança.",
+                "AVISO",
+                None,
+                executive_id
+            )
+        
+        # Alerta geral para novos itens
+        database.add_alert(
+            "📋 Novo item adicionado",
+            f"Item '{title}' foi adicionado para {executive_name}. Status: {status}, Severidade: {severity}",
+            "INFO",
+            None,
+            executive_id
+        )
+        
         flash('Item identificado adicionado com sucesso!', 'success')
         return redirect(url_for('items'))
     return render_template('add_edit_item.html', item=None, executives=executives_list, active_page='items')
@@ -308,6 +383,12 @@ def edit_item(item_id):
                 image_filename = item['image_filename']
 
         database.update_item(item_id, executive_id, title, description, item_type, severity, status, identified_date, image_filename)
+        
+        # Registrar log de auditoria
+        executive = database.get_executive_by_id(executive_id)
+        executive_name = executive['name'] if executive else f'ID: {executive_id}'
+        log_user_action('Item atualizado', f'Item "{title}" (ID: {item_id}) atualizado para {executive_name}', 'items', item_id)
+        
         flash('Item atualizado com sucesso!', 'success')
         return redirect(url_for('items'))
     return render_template('add_edit_item.html', item=item, executives=executives_list, item_images=item_images, active_page='items')
@@ -316,7 +397,12 @@ def edit_item(item_id):
 @app.route('/delete_item/<int:item_id>', methods=['POST'])
 @login_required
 def delete_item(item_id):
+    # Obter dados do item antes de excluir para o log
+    item = database.get_item_by_id(item_id)
+    item_title = item['title'] if item else f'ID: {item_id}'
+    
     database.delete_item(item_id)
+    log_user_action('Item excluído', f'Item "{item_title}" foi excluído do sistema', 'items', item_id)
     flash('Item excluído com sucesso!', 'success')
     return redirect(url_for('items'))
 
@@ -327,6 +413,21 @@ def mark_item_treated(item_id):
     if item:
         image_filename = item.get('image_filename') if hasattr(item, 'get') else item['image_filename'] if 'image_filename' in item else None
         database.update_item(item_id, item['executive_id'], item['title'], item['description'], item['type'], item['severity'], 'TRATADO', item['identified_date'], image_filename)
+        
+        # Registrar log de auditoria
+        executive = database.get_executive_by_id(item['executive_id'])
+        executive_name = executive['name'] if executive else f'ID: {item["executive_id"]}'
+        log_user_action('Item marcado como tratado', f'Item "{item["title"]}" de {executive_name} foi marcado como TRATADO', 'items', item_id)
+        
+        # Criar alerta de sucesso
+        database.add_alert(
+            "✅ Item tratado com sucesso",
+            f"Item '{item['title']}' de {executive_name} foi marcado como TRATADO. Problema resolvido!",
+            "INFO",
+            item_id,
+            item['executive_id']
+        )
+        
         flash('Item marcado como TRATADO!', 'success')
     else:
         flash('Item não encontrado.', 'danger')
@@ -339,6 +440,21 @@ def mark_item_ignored(item_id):
     if item:
         image_filename = item.get('image_filename') if hasattr(item, 'get') else item['image_filename'] if 'image_filename' in item else None
         database.update_item(item_id, item['executive_id'], item['title'], item['description'], item['type'], item['severity'], 'IGNORADO', item['identified_date'], image_filename)
+        
+        # Registrar log de auditoria
+        executive = database.get_executive_by_id(item['executive_id'])
+        executive_name = executive['name'] if executive else f'ID: {item["executive_id"]}'
+        log_user_action('Item marcado como ignorado', f'Item "{item["title"]}" de {executive_name} foi marcado como IGNORADO', 'items', item_id)
+        
+        # Criar alerta informativo
+        database.add_alert(
+            "ℹ️ Item marcado como ignorado",
+            f"Item '{item['title']}' de {executive_name} foi marcado como IGNORADO.",
+            "INFO",
+            item_id,
+            item['executive_id']
+        )
+        
         flash('Item marcado como IGNORADO!', 'info')
     else:
         flash('Item não encontrado.', 'danger')
@@ -349,19 +465,228 @@ def mark_item_ignored(item_id):
 @login_required
 def reports():
     try:
-        return render_template('reports.html', active_page='reports')
+        # Obter estatísticas para a página
+        total_executives = len(database.get_all_executives())
+        total_items = len(database.get_all_items())
+        total_audit_logs = len(database.get_all_audit_logs())
+        
+        return render_template('reports.html', 
+                             active_page='reports',
+                             total_executives=total_executives,
+                             total_items=total_items,
+                             total_audit_logs=total_audit_logs)
     except Exception as e:
         print(f"Erro na rota reports: {e}")
-        return render_template('reports.html', active_page='reports')
+        return render_template('reports.html', 
+                             active_page='reports',
+                             total_executives=0,
+                             total_items=0,
+                             total_audit_logs=0)
 
-@app.route('/settings')
+# --- ROTAS DE EXPORTAÇÃO DE RELATÓRIOS ---
+
+@app.route('/export_report/<report_type>')
 @login_required
-def settings():
+def export_report(report_type):
+    """Exporta relatórios em formato CSV."""
     try:
-        return render_template('settings.html', active_page='settings')
+        import csv
+        import io
+        from flask import make_response
+        
+        # Registrar log de auditoria
+        log_user_action('Relatório exportado', f'Relatório de {report_type} exportado em CSV')
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        if report_type == 'executives':
+            # Exportar dados dos executivos
+            executives = database.get_all_executives()
+            writer.writerow(['ID', 'Nome', 'Email', 'Cargo', 'Departamento', 'Score de Risco', 'Nível de Risco'])
+            for exec in executives:
+                writer.writerow([
+                    exec['id'],
+                    exec['name'],
+                    exec['email'],
+                    exec['role'] or '',
+                    exec['department'] or '',
+                    exec['risk_score'],
+                    exec['risk_level']
+                ])
+                
+        elif report_type == 'items':
+            # Exportar dados dos itens identificados
+            items = database.get_all_items()
+            writer.writerow(['ID', 'Executivo', 'Título', 'Descrição', 'Tipo', 'Severidade', 'Status', 'Data Identificação'])
+            for item in items:
+                writer.writerow([
+                    item['id'],
+                    item['executive_name'] or 'N/A',
+                    item['title'],
+                    item['description'] or '',
+                    item['type'],
+                    item['severity'],
+                    item['status'],
+                    item['identified_date']
+                ])
+                
+        elif report_type == 'audit':
+            # Exportar logs de auditoria
+            audit_logs = database.get_all_audit_logs()
+            writer.writerow(['ID', 'Data/Hora', 'Usuário', 'Ação', 'Detalhes', 'Tabela Relacionada', 'ID Relacionado'])
+            for log in audit_logs:
+                writer.writerow([
+                    log['id'],
+                    log['timestamp'],
+                    log['user'],
+                    log['action'],
+                    log['details'],
+                    log['related_table'] or '',
+                    log['related_id'] or ''
+                ])
+        else:
+            flash('Tipo de relatório inválido.', 'danger')
+            return redirect(url_for('reports'))
+        
+        # Preparar resposta CSV
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_{report_type}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        return response
+        
     except Exception as e:
-        print(f"Erro na rota settings: {e}")
-        return render_template('settings.html', active_page='settings')
+        print(f"Erro ao exportar relatório {report_type}: {e}")
+        flash('Erro ao exportar relatório. Tente novamente.', 'danger')
+        return redirect(url_for('reports'))
+
+# --- ROTAS DE ALERTAS ---
+@app.route('/alerts')
+@login_required
+def alerts():
+    """Página principal de alertas."""
+    try:
+        all_alerts = database.get_all_alerts()
+        return render_template('alerts.html', alerts=all_alerts, active_page='alerts')
+    except Exception as e:
+        print(f"Erro na rota alerts: {e}")
+        return render_template('alerts.html', alerts=[], active_page='alerts')
+
+@app.route('/mark_alert_read/<int:alert_id>', methods=['POST'])
+@login_required
+def mark_alert_read(alert_id):
+    """Marca um alerta como lido."""
+    try:
+        database.mark_alert_as_read(alert_id)
+        log_user_action('Alerta marcado como lido', f'Alerta ID: {alert_id} foi marcado como lido', 'alerts', alert_id)
+        return {'success': True}
+    except Exception as e:
+        print(f"Erro ao marcar alerta como lido: {e}")
+        return {'success': False, 'error': str(e)}, 500
+
+@app.route('/delete_alert/<int:alert_id>', methods=['DELETE'])
+@login_required
+def delete_alert(alert_id):
+    """Remove um alerta."""
+    try:
+        database.delete_alert(alert_id)
+        log_user_action('Alerta excluído', f'Alerta ID: {alert_id} foi excluído do sistema', 'alerts', alert_id)
+        return {'success': True}
+    except Exception as e:
+        print(f"Erro ao deletar alerta: {e}")
+        return {'success': False, 'error': str(e)}, 500
+
+@app.route('/get_unread_alerts_count')
+@login_required
+def get_unread_alerts_count():
+    """Retorna o número de alertas não lidos."""
+    try:
+        count = database.get_unread_alerts_count()
+        return {'count': count}
+    except Exception as e:
+        print(f"Erro ao contar alertas: {e}")
+        return {'count': 0}
+
+@app.route('/get_recent_alerts')
+@login_required
+def get_recent_alerts():
+    """Retorna os alertas mais recentes para o dropdown de notificações."""
+    try:
+        # Buscar os 5 alertas mais recentes
+        recent_alerts = database.get_recent_alerts(limit=5)
+        
+        # Formatar os alertas para o dropdown
+        formatted_alerts = []
+        for alert in recent_alerts:
+            # Calcular tempo relativo
+            time_diff = datetime.datetime.now() - datetime.datetime.strptime(alert['created_at'], '%d/%m/%Y, %H:%M:%S')
+            
+            if time_diff.days > 0:
+                time_ago = f"{time_diff.days} dia{'s' if time_diff.days > 1 else ''} atrás"
+            elif time_diff.seconds >= 3600:
+                hours = time_diff.seconds // 3600
+                time_ago = f"{hours} hora{'s' if hours > 1 else ''} atrás"
+            elif time_diff.seconds >= 60:
+                minutes = time_diff.seconds // 60
+                time_ago = f"{minutes} min atrás"
+            else:
+                time_ago = "Agora"
+            
+            # Determinar o ícone baseado no tipo
+            icon_map = {
+                'CRITICO': 'fas fa-exclamation-triangle',
+                'AVISO': 'fas fa-exclamation-circle',
+                'INFO': 'fas fa-info-circle'
+            }
+            
+            formatted_alerts.append({
+                'id': alert['id'],
+                'title': alert['title'],
+                'description': alert['description'][:80] + '...' if len(alert['description']) > 80 else alert['description'],
+                'type': alert['type'],
+                'icon': icon_map.get(alert['type'], 'fas fa-bell'),
+                'is_read': alert['is_read'],
+                'time_ago': time_ago,
+                'executive_name': alert.get('executive_name'),
+                'item_title': alert.get('item_title')
+            })
+        
+        return {'success': True, 'alerts': formatted_alerts}
+    except Exception as e:
+        print(f"Erro ao buscar alertas recentes: {e}")
+        return {'success': False, 'error': str(e)}, 500
+
+@app.route('/create_sample_alerts', methods=['POST'])
+@login_required
+def create_sample_alerts():
+    """Cria alertas de exemplo para demonstração."""
+    try:
+        database.create_sample_alerts()
+        return {'success': True}
+    except Exception as e:
+        print(f"Erro ao criar alertas de exemplo: {e}")
+        return {'success': False, 'error': str(e)}, 500
+
+# --- Rota para AUDITORIA ---
+@app.route('/audit')
+@login_required
+def audit():
+    """Página de auditoria com histórico de alterações."""
+    audit_logs = database.get_all_audit_logs()
+    return render_template('audit.html', audit_logs=audit_logs, active_page='audit')
+
+@app.route('/create_sample_audit_logs', methods=['POST'])
+@login_required
+def create_sample_audit_logs():
+    """Cria logs de auditoria de exemplo para demonstração."""
+    try:
+        database.create_sample_audit_logs()
+        return {'success': True}
+    except Exception as e:
+        print(f"Erro ao criar logs de auditoria de exemplo: {e}")
+        return {'success': False, 'error': str(e)}, 500
 
 # --- Rotas para imagens múltiplas ---
 @app.route('/add_item_image/<int:item_id>', methods=['POST'])
@@ -383,6 +708,19 @@ def add_item_image(item_id):
             
             # Salvar no banco
             database.add_item_image(item_id, filename, description)
+            
+            # Criar alerta para nova imagem
+            item = database.get_item_by_id(item_id)
+            if item:
+                executive = database.get_executive_by_id(item['executive_id'])
+                executive_name = executive['name'] if executive else 'Executivo'
+                database.add_alert(
+                    "📷 Nova imagem adicionada",
+                    f"Nova imagem foi adicionada ao item '{item['title']}' de {executive_name}",
+                    "INFO",
+                    item_id,
+                    item['executive_id']
+                )
             
             return {'success': True, 'filename': filename, 'description': description}
         else:
@@ -464,6 +802,14 @@ try:
     with app.app_context():
         database.init_db()
         print("✅ Banco de dados inicializado com sucesso")
+        
+        # Criar alerta de sistema iniciado
+        database.add_alert(
+            "🚀 Sistema VIP Monitoring iniciado",
+            f"Sistema iniciado com sucesso em {datetime.datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}. Monitoramento ativo!",
+            "INFO"
+        )
+        
 except Exception as e:
     print(f"❌ Erro ao inicializar banco de dados: {e}")
     traceback.print_exc()

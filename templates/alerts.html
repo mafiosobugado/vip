@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block title %}Alertas - VIP Monitoring{% endblock %}
+
+{% block page_title %}Alertas{% endblock %}
+
+{% block content %}
+    <div class="content-header">
+        <div class="header-content">
+            <div class="header-text">
+                <h1>Alertas</h1>
+                <p class="subtitle">Notificações e alertas do sistema</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn-bulk btn-read-all" onclick="markAllAsRead()" title="Marcar todos como lidos">
+                    <i class="fas fa-check-double"></i> Ler Tudo
+                </button>
+                <button class="btn-bulk btn-delete-all" onclick="deleteAllAlerts()" title="Excluir todos os alertas">
+                    <i class="fas fa-trash-alt"></i> Excluir Tudo
+                </button>
+            </div>
+        </div>
+        <div class="alerts-stats">
+            <div class="stat-item">
+                <i class="fas fa-bell"></i>
+                <span>Total: <strong id="totalAlerts">{{ alerts|length }}</strong></span>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-bell-slash"></i>
+                <span>Não lidos: <strong id="unreadAlerts">{{ alerts|selectattr('is_read', 'equalto', 0)|list|length }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="alerts-container">
+        {% if alerts %}
+            {% for alert in alerts %}
+            <div class="alert-card alert-{{ alert.type.lower() }} {% if not alert.is_read %}alert-unread{% endif %}" data-alert-id="{{ alert.id }}">
+                <div class="alert-header">
+                    <div class="alert-type-badge">
+                        {% if alert.type == 'CRITICO' %}
+                            <span class="badge badge-critical">CRÍTICO</span>
+                        {% elif alert.type == 'AVISO' %}
+                            <span class="badge badge-warning">AVISO</span>
+                        {% else %}
+                            <span class="badge badge-info">INFO</span>
+                        {% endif %}
+                        {% if not alert.is_read %}
+                            <span class="unread-indicator">●</span>
+                        {% endif %}
+                    </div>
+                    <div class="alert-actions">
+                        {% if not alert.is_read %}
+                            <button class="btn-action btn-mark-read" onclick="markAsRead({{ alert.id }})" title="Marcar como lido">
+                                <i class="fas fa-check"></i> Marcar como lido
+                            </button>
+                        {% endif %}
+                        <button class="btn-action btn-delete" onclick="deleteAlert({{ alert.id }})" title="Excluir">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="alert-content">
+                    <h3 class="alert-title">{{ alert.title }}</h3>
+                    <p class="alert-description">{{ alert.description }}</p>
+                    
+                    {% if alert.executive_name or alert.item_title %}
+                    <div class="alert-related">
+                        {% if alert.executive_name %}
+                            <span class="related-info">
+                                <i class="fas fa-user"></i> {{ alert.executive_name }}
+                            </span>
+                        {% endif %}
+                        {% if alert.item_title %}
+                            <span class="related-info">
+                                <i class="fas fa-file-alt"></i> {{ alert.item_title }}
+                            </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="alert-timestamp">
+                        <i class="fas fa-clock"></i> {{ alert.created_at }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-alerts">
+                <i class="fas fa-bell-slash fa-3x"></i>
+                <h3>Nenhum alerta encontrado</h3>
+                <p>Não há alertas no sistema no momento.</p>
+                <button class="btn-primary" onclick="createSampleAlerts()">
+                    <i class="fas fa-plus"></i> Criar Alertas de Exemplo
+                </button>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function markAsRead(alertId) {
+    fetch(`/mark_alert_read/${alertId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Atualizar a interface
+            const alertCard = document.querySelector(`[data-alert-id="${alertId}"]`);
+            alertCard.classList.remove('alert-unread');
+            
+            // Remover o indicador de não lido e botão
+            const unreadIndicator = alertCard.querySelector('.unread-indicator');
+            const markReadBtn = alertCard.querySelector('.btn-mark-read');
+            
+            if (unreadIndicator) unreadIndicator.remove();
+            if (markReadBtn) markReadBtn.remove();
+            
+            // Atualizar contadores
+            updateNotificationCount();
+            updateStats();
+        } else {
+            alert('Erro ao marcar como lido: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao marcar como lido.');
+    });
+}
+
+function deleteAlert(alertId) {
+    if (!confirm('Tem certeza que deseja excluir este alerta?')) {
+        return;
+    }
+    
+    fetch(`/delete_alert/${alertId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remover o alerta da interface com animação
+            const alertCard = document.querySelector(`[data-alert-id="${alertId}"]`);
+            alertCard.style.animation = 'slideOut 0.5s ease-out';
+            setTimeout(() => {
+                alertCard.remove();
+                updateStats();
+                
+                // Se não há mais alertas, mostrar mensagem
+                if (document.querySelectorAll('.alert-card').length === 0) {
+                    location.reload();
+                }
+            }, 500);
+            
+            // Atualizar contadores
+            updateNotificationCount();
+        } else {
+            alert('Erro ao excluir alerta: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao excluir alerta.');
+    });
+}
+
+function markAllAsRead() {
+    const unreadAlerts = document.querySelectorAll('.alert-unread');
+    
+    if (unreadAlerts.length === 0) {
+        alert('Não há alertas não lidos.');
+        return;
+    }
+    
+    if (!confirm(`Tem certeza que deseja marcar ${unreadAlerts.length} alerta(s) como lidos?`)) {
+        return;
+    }
+    
+    const button = document.querySelector('.btn-read-all');
+    button.disabled = true;
+    button.classList.add('loading');
+    
+    // Coletar IDs dos alertas não lidos
+    const alertIds = Array.from(unreadAlerts).map(card => card.getAttribute('data-alert-id'));
+    
+    // Marcar todos como lidos
+    Promise.all(alertIds.map(id => 
+        fetch(`/mark_alert_read/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(response => response.json())
+    ))
+    .then(results => {
+        const successful = results.filter(r => r.success).length;
+        
+        if (successful > 0) {
+            // Atualizar interface para todos os alertas marcados
+            unreadAlerts.forEach(card => {
+                card.classList.remove('alert-unread');
+                const unreadIndicator = card.querySelector('.unread-indicator');
+                const markReadBtn = card.querySelector('.btn-mark-read');
+                
+                if (unreadIndicator) unreadIndicator.remove();
+                if (markReadBtn) markReadBtn.remove();
+            });
+            
+            updateNotificationCount();
+            updateStats();
+            
+            // Toast de sucesso
+            showToast(`${successful} alerta(s) marcado(s) como lido(s)`, 'success');
+        }
+        
+        if (results.some(r => !r.success)) {
+            alert('Alguns alertas não puderam ser marcados como lidos.');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao marcar alertas como lidos.');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.classList.remove('loading');
+    });
+}
+
+function deleteAllAlerts() {
+    const allAlerts = document.querySelectorAll('.alert-card');
+    
+    if (allAlerts.length === 0) {
+        alert('Não há alertas para excluir.');
+        return;
+    }
+    
+    if (!confirm(`Tem certeza que deseja excluir TODOS os ${allAlerts.length} alerta(s)? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    const button = document.querySelector('.btn-delete-all');
+    button.disabled = true;
+    button.classList.add('loading');
+    
+    // Coletar IDs de todos os alertas
+    const alertIds = Array.from(allAlerts).map(card => card.getAttribute('data-alert-id'));
+    
+    // Excluir todos os alertas
+    Promise.all(alertIds.map(id => 
+        fetch(`/delete_alert/${id}`, {
+            method: 'DELETE'
+        }).then(response => response.json())
+    ))
+    .then(results => {
+        const successful = results.filter(r => r.success).length;
+        
+        if (successful > 0) {
+            // Animar remoção de todos os alertas
+            allAlerts.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.animation = 'slideOut 0.5s ease-out';
+                    setTimeout(() => card.remove(), 500);
+                }, index * 100);
+            });
+            
+            // Recarregar página após animações
+            setTimeout(() => {
+                location.reload();
+            }, (allAlerts.length * 100) + 600);
+            
+            updateNotificationCount();
+            
+            // Toast de sucesso
+            showToast(`${successful} alerta(s) excluído(s)`, 'success');
+        }
+        
+        if (results.some(r => !r.success)) {
+            alert('Alguns alertas não puderam ser excluídos.');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao excluir alertas.');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.classList.remove('loading');
+    });
+}
+
+function createSampleAlerts() {
+    const button = document.querySelector('.btn-primary');
+    button.disabled = true;
+    button.classList.add('loading');
+    
+    fetch('/create_sample_alerts', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Alertas de exemplo criados!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            alert('Erro ao criar alertas: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao criar alertas.');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.classList.remove('loading');
+    });
+}
+
+function updateNotificationCount() {
+    fetch('/get_unread_alerts_count')
+    .then(response => response.json())
+    .then(data => {
+        const badge = document.querySelector('.notification-badge');
+        if (badge) {
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    })
+    .catch(error => console.error('Erro ao atualizar contador:', error));
+}
+
+function updateStats() {
+    const totalAlerts = document.querySelectorAll('.alert-card').length;
+    const unreadAlerts = document.querySelectorAll('.alert-unread').length;
+    
+    const totalElement = document.getElementById('totalAlerts');
+    const unreadElement = document.getElementById('unreadAlerts');
+    
+    if (totalElement) totalElement.textContent = totalAlerts;
+    if (unreadElement) unreadElement.textContent = unreadAlerts;
+}
+
+function showToast(message, type = 'info') {
+    // Criar toast
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    // Adicionar estilos
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? 'linear-gradient(135deg, #28a745, #20c997)' : 'linear-gradient(135deg, #007bff, #0056b3)'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        transform: translateX(400px);
+        transition: transform 0.3s ease;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Animar entrada
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        toast.style.transform = 'translateX(400px)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Animação para entrada dos cards
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.alert-card');
+    cards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.1}s`;
+    });
+});
+
+// Animação para remoção
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: translateX(100%) scale(0.8);
+        }
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}
