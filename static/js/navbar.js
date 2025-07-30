@@ -9,37 +9,6 @@ function toggleSidebar() {
     localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
 }
 
-// Toggle do menu do usuário na sidebar
-function toggleUserMenu() {
-    const dropdown = document.getElementById('userMenuDropdown');
-    const toggle = document.querySelector('.user-menu-toggle i');
-    
-    if (dropdown.style.display === 'block') {
-        dropdown.style.display = 'none';
-        toggle.className = 'fas fa-chevron-up';
-    } else {
-        dropdown.style.display = 'block';
-        toggle.className = 'fas fa-chevron-down';
-    }
-}
-
-// Toggle do menu do usuário na navbar
-function toggleNavUserMenu() {
-    const dropdown = document.getElementById('userNavDropdown');
-    const chevron = document.getElementById('navUserChevron');
-    const userInfo = document.querySelector('.user-info-navbar');
-    
-    if (dropdown.style.display === 'block') {
-        dropdown.style.display = 'none';
-        chevron.className = 'fas fa-chevron-down';
-        userInfo.classList.remove('active');
-    } else {
-        dropdown.style.display = 'block';
-        chevron.className = 'fas fa-chevron-up';
-        userInfo.classList.add('active');
-    }
-}
-
 // Toggle das notificações
 function toggleNotifications() {
     const dropdown = document.getElementById('notificationsDropdown');
@@ -206,4 +175,4 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', function() {
         setupMobileResponsive();
     });
-});
+

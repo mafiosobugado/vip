@@ -219,68 +219,7 @@ body {
     color: var(--text-color-light-2);
 }
 
-.user-menu-toggle {
-    background: none;
-    border: none;
-    color: var(--text-color-light-2);
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-}
-
-.user-menu-toggle:hover {
-    background: var(--dark-bg-hover);
-    color: var(--primary-color);
-    transform: scale(1.1);
-}
-
-.user-menu-dropdown {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    right: 0;
-    background: var(--dark-bg-3);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
-    display: none;
-    z-index: 1000;
-}
-
-.user-menu-dropdown .menu-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    color: var(--text-color-light-2);
-    text-decoration: none;
-    transition: all 0.3s ease;
-    font-size: 0.85em;
-}
-
-.user-menu-dropdown .menu-item:hover {
-    background: var(--dark-bg-hover);
-    color: var(--primary-color);
-}
-
-.user-menu-dropdown .menu-item.logout {
-    color: #dc3545;
-}
-
-.user-menu-dropdown .menu-item.logout:hover {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-}
-
-.menu-divider {
-    height: 1px;
-    background: var(--border-color);
-    margin: 4px 0;
-}
-
-.sidebar.collapsed .user-profile .user-info,
-.sidebar.collapsed .user-menu {
+.sidebar.collapsed .user-profile .user-info {
     display: none;
 }
 
@@ -377,6 +316,18 @@ body {
     color: var(--primary-color);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(162, 89, 255, 0.2);
+}
+
+/* Estilo específico para o botão de logout */
+.action-btn.logout-btn {
+    color: #ff6b6b;
+}
+
+.action-btn.logout-btn:hover {
+    background: rgba(255, 107, 107, 0.1);
+    color: #ff8787;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
 }
 
 .notification-badge {
@@ -1555,6 +1506,73 @@ form button.btn-action {
 .auth-card .form-group input::placeholder {
     color: var(--text-color-light-2);
     opacity: 0.7;
+}
+
+/* Radio buttons for login */
+.radio-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+    background: transparent;
+    flex: 1;
+}
+
+.radio-option:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.radio-option input[type="radio"] {
+    display: none;
+}
+
+.radio-custom {
+    width: 12px;
+    height: 12px;
+    border: 1px solid #666;
+    border-radius: 50%;
+    margin-right: 8px;
+    position: relative;
+    transition: border-color 0.15s ease;
+    background: transparent;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom {
+    border-color: var(--primary-color);
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--primary-color);
+}
+
+.radio-option input[type="radio"]:checked ~ .radio-text {
+    color: var(--text-color-light);
+}
+
+.radio-text {
+    color: var(--text-color-light-2);
+    font-size: 0.85em;
+    transition: color 0.15s ease;
+}
+
+.radio-text i {
+    display: none;
 }
 
 .btn-primary {
@@ -4631,5 +4649,63 @@ input:checked + .toggle-slider:before {
 
 .opacity-50 { opacity: 0.5; }
 .opacity-75 { opacity: 0.75; }
+
+/* ===== DROPDOWN DO USUÁRIO NA NAVBAR ===== */
+.user-info-navbar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.user-info-navbar:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.user-info-navbar.active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.user-avatar-small {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    color: white;
+    font-size: 16px;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-details .user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1;
+}
+
+.user-details .user-status {
+    font-size: 11px;
+    color: #28a745;
+    line-height: 1;
+    font-weight: 500;
+}
+
+.user-details .user-status.online::before {
+    content: '●';
+    margin-right: 4px;
+}
 
 /* ===== FIM DO ARQUIVO CSS ===== */

@@ -57,6 +57,14 @@
                             <span class="nav-text">Auditoria</span>
                         </a>
                     </li>
+                    {% if current_user.is_authenticated and current_user.user_type == 'admin' %}
+                    <li class="nav-item {{ 'active' if active_page == 'config' else '' }}">
+                        <a href="{{ url_for('config') }}">
+                            <i class="fas fa-cogs"></i>
+                            <span class="nav-text">Configurações</span>
+                        </a>
+                    </li>
+                    {% endif %}
                 </ul>
             </nav>
 
@@ -67,27 +75,7 @@
                     </div>
                     <div class="user-info">
                         <span class="user-name">{{ current_user.username if current_user.is_authenticated else 'Usuário' }}</span>
-                        <span class="user-role">Administrador</span>
-                    </div>
-                    <div class="user-menu">
-                        <button class="user-menu-toggle" onclick="toggleUserMenu()">
-                            <i class="fas fa-chevron-up"></i>
-                        </button>
-                        <div class="user-menu-dropdown" id="userMenuDropdown">
-                            <a href="#" class="menu-item">
-                                <i class="fas fa-user-edit"></i>
-                                <span>Perfil</span>
-                            </a>
-                            <a href="#" class="menu-item">
-                                <i class="fas fa-key"></i>
-                                <span>Alterar Senha</span>
-                            </a>
-                            <div class="menu-divider"></div>
-                            <a href="{{ url_for('logout') }}" class="menu-item logout">
-                                <i class="fas fa-sign-out-alt"></i>
-                                <span>Sair</span>
-                            </a>
-                        </div>
+                        <span class="user-role">{{ 'Administrador' if current_user.is_authenticated and current_user.user_type == 'admin' else 'Usuário' }}</span>
                     </div>
                 </div>
             </div>
@@ -159,39 +147,19 @@
                         <button class="action-btn" title="Tela cheia" onclick="toggleFullscreen()">
                             <i class="fas fa-expand"></i>
                         </button>
+                        
+                        <button class="action-btn logout-btn" title="Sair" onclick="window.location.href='{{ url_for('logout') }}';return false;">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
                     </div>
 
-                    <div class="user-info-navbar" onclick="toggleNavUserMenu()">
+                    <div class="user-info-navbar">
                         <div class="user-avatar-small">
                             <i class="fas fa-user-circle"></i>
                         </div>
                         <div class="user-details">
                             <span class="user-name">{{ current_user.username if current_user.is_authenticated else 'Usuário' }}</span>
-                            <span class="user-status online">Online</span>
-                        </div>
-                        <div class="user-chevron">
-                            <i class="fas fa-chevron-down" id="navUserChevron"></i>
-                        </div>
-                        
-                        <!-- Dropdown do usuário na navbar -->
-                        <div class="user-nav-dropdown" id="userNavDropdown">
-                            <a href="#" class="nav-menu-item">
-                                <i class="fas fa-user-edit"></i>
-                                <span>Meu Perfil</span>
-                            </a>
-                            <a href="#" class="nav-menu-item">
-                                <i class="fas fa-cog"></i>
-                                <span>Configurações</span>
-                            </a>
-                            <a href="#" class="nav-menu-item">
-                                <i class="fas fa-key"></i>
-                                <span>Alterar Senha</span>
-                            </a>
-                            <div class="nav-menu-divider"></div>
-                            <a href="{{ url_for('logout') }}" class="nav-menu-item logout">
-                                <i class="fas fa-sign-out-alt"></i>
-                                <span>Sair</span>
-                            </a>
+                            <span class="user-status online">{{ 'Administrador' if current_user.is_authenticated and current_user.user_type == 'admin' else 'Usuário' }}</span>
                         </div>
                     </div>
                 </div>
@@ -343,6 +311,7 @@
 
         // Fechar dropdown ao clicar fora
         document.addEventListener('click', function(event) {
+            // Fechar dropdown de alertas
             const dropdown = document.getElementById('alertsDropdown');
             const button = document.getElementById('alertBtn');
             

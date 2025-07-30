@@ -108,11 +108,13 @@ def init_db():
 
 # --- Funções para a tabela USERS ---
 class User:
-    def __init__(self, id, username, email, password):
+    def __init__(self, id, username, email, password, user_type='user', disabled=False):
         self.id = id
         self.username = username
         self.email = email
         self.password = password
+        self.user_type = user_type
+        self.disabled = disabled
 
     def is_authenticated(self):
         return True
@@ -132,7 +134,9 @@ class User:
         user_data = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
         conn.close()
         if user_data:
-            return User(user_data['id'], user_data['username'], user_data['email'], user_data['password'])
+            user_type = user_data['user_type'] if 'user_type' in user_data.keys() else 'user'
+            disabled = user_data['disabled'] if 'disabled' in user_data.keys() else False
+            return User(user_data['id'], user_data['username'], user_data['email'], user_data['password'], user_type, disabled)
         return None
 
     @staticmethod
@@ -141,7 +145,9 @@ class User:
         user_data = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
         if user_data:
-            return User(user_data['id'], user_data['username'], user_data['email'], user_data['password'])
+            user_type = user_data['user_type'] if 'user_type' in user_data.keys() else 'user'
+            disabled = user_data['disabled'] if 'disabled' in user_data.keys() else False
+            return User(user_data['id'], user_data['username'], user_data['email'], user_data['password'], user_type, disabled)
         return None
 
     @staticmethod
@@ -150,19 +156,85 @@ class User:
         user_data = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
         conn.close()
         if user_data:
-            return User(user_data['id'], user_data['username'], user_data['email'], user_data['password'])
+            user_type = user_data['user_type'] if 'user_type' in user_data.keys() else 'user'
+            disabled = user_data['disabled'] if 'disabled' in user_data.keys() else False
+            return User(user_data['id'], user_data['username'], user_data['email'], user_data['password'], user_type, disabled)
         return None
 
     @staticmethod
-    def create(username, email, password_hash):
+    def create(username, email, password_hash, user_type='user'):
         conn = get_db_connection()
         try:
-            conn.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                         (username, email, password_hash))
+            conn.execute('INSERT INTO users (username, email, password, user_type) VALUES (?, ?, ?, ?)',
+                         (username, email, password_hash, user_type))
             conn.commit()
             return True
         except sqlite3.IntegrityError:
             return False # Usuário ou email já existem
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_all_users():
+        conn = get_db_connection()
+        users_data = conn.execute('SELECT * FROM users ORDER BY username').fetchall()
+        conn.close()
+        users = []
+        for user_data in users_data:
+            user_type = user_data['user_type'] if 'user_type' in user_data.keys() else 'user'
+            disabled = user_data['disabled'] if 'disabled' in user_data.keys() else False
+            users.append(User(user_data['id'], user_data['username'], user_data['email'], user_data['password'], user_type, disabled))
+        return users
+
+    @staticmethod
+    def update_user_type(user_id, user_type):
+        conn = get_db_connection()
+        try:
+            conn.execute('UPDATE users SET user_type = ? WHERE id = ?', (user_type, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erro ao atualizar tipo de usuário: {e}")
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_user_status(user_id, disabled):
+        conn = get_db_connection()
+        try:
+            conn.execute('UPDATE users SET disabled = ? WHERE id = ?', (disabled, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erro ao atualizar status do usuário: {e}")
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_user_password(user_id, new_password_hash):
+        conn = get_db_connection()
+        try:
+            conn.execute('UPDATE users SET password = ? WHERE id = ?', (new_password_hash, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erro ao atualizar senha do usuário: {e}")
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def delete_user(user_id):
+        conn = get_db_connection()
+        try:
+            conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erro ao deletar usuário: {e}")
+            return False
         finally:
             conn.close()
 

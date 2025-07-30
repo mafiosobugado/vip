@@ -37,6 +37,21 @@
                     <label for="confirm_password"><i class="fas fa-lock"></i> Confirmar Senha</label>
                     <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirme sua senha" required>
                 </div>
+                <div class="form-group">
+                    <label><i class="fas fa-user-cog"></i> Tipo de Usuário</label>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="user_type" value="user" checked>
+                            <span class="radio-custom"></span>
+                            <span class="radio-text"><i class="fas fa-user"></i> Usuário</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="user_type" value="admin">
+                            <span class="radio-custom"></span>
+                            <span class="radio-text"><i class="fas fa-user-shield"></i> Administrador</span>
+                        </label>
+                    </div>
+                </div>
                 <button type="submit" class="btn-primary">
                     <i class="fas fa-user-check"></i> Cadastrar
                 </button>

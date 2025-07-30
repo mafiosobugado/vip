@@ -1,0 +1,542 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações{% endblock %}
+{% block page_title %}Configurações do Sistema{% endblock %}
+
+{% block content %}
+<div class="config-container">
+    <div class="config-header">
+        <h2><i class="fas fa-cogs"></i> Gerenciamento de Usuários</h2>
+        <p>Gerencie permissões, senhas e status das contas do sistema</p>
+    </div>
+
+    <!-- Filtros -->
+    <div class="config-filters">
+        <div class="filter-group">
+            <button class="filter-btn active" data-filter="all">
+                <i class="fas fa-users"></i> Todos
+            </button>
+            <button class="filter-btn" data-filter="admin">
+                <i class="fas fa-user-shield"></i> Administradores
+            </button>
+            <button class="filter-btn" data-filter="user">
+                <i class="fas fa-user"></i> Usuários
+            </button>
+            <button class="filter-btn" data-filter="disabled">
+                <i class="fas fa-user-slash"></i> Desabilitados
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de Usuários -->
+    <div class="users-list">
+        {% for user in users %}
+        <div class="user-card" data-user-type="{{ user.user_type }}" data-status="{{ 'disabled' if user.disabled else 'active' }}">
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <h3>{{ user.username }}</h3>
+                    <p>{{ user.email }}</p>
+                    <div class="user-badges">
+                        <span class="badge {{ 'admin' if user.user_type == 'admin' else 'user' }}">
+                            <i class="fas fa-{{ 'user-shield' if user.user_type == 'admin' else 'user' }}"></i>
+                            {{ 'Administrador' if user.user_type == 'admin' else 'Usuário' }}
+                        </span>
+                        <span class="badge {{ 'active' if not user.disabled else 'disabled' }}">
+                            <i class="fas fa-{{ 'check-circle' if not user.disabled else 'times-circle' }}"></i>
+                            {{ 'Ativo' if not user.disabled else 'Desabilitado' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="user-actions">
+                <!-- Toggle Admin -->
+                <button class="action-btn toggle-admin" title="{{ 'Remover Admin' if user.user_type == 'admin' else 'Tornar Admin' }}" 
+                        onclick="toggleAdmin({{ user.id }}, '{{ user.user_type }}')">
+                    <i class="fas fa-{{ 'user-minus' if user.user_type == 'admin' else 'user-plus' }}"></i>
+                </button>
+                
+                <!-- Toggle Status -->
+                <button class="action-btn toggle-status" title="{{ 'Desabilitar' if not user.disabled else 'Habilitar' }}" 
+                        onclick="toggleStatus({{ user.id }}, {{ 'true' if not user.disabled else 'false' }})">
+                    <i class="fas fa-{{ 'ban' if not user.disabled else 'check' }}"></i>
+                </button>
+                
+                <!-- Change Password -->
+                <button class="action-btn change-password" title="Alterar Senha" 
+                        onclick="openPasswordModal({{ user.id }}, '{{ user.username }}')">
+                    <i class="fas fa-key"></i>
+                </button>
+                
+                <!-- Delete User -->
+                {% if user.id != current_user.id %}
+                <button class="action-btn delete-user" title="Excluir Usuário" 
+                        onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal para alterar senha -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-key"></i> Alterar Senha</h3>
+            <button class="close-modal" onclick="closePasswordModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="passwordForm">
+                <input type="hidden" id="userId" name="user_id">
+                <div class="form-group">
+                    <label for="newPassword">Nova Senha</label>
+                    <input type="password" id="newPassword" name="new_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirmar Senha</label>
+                    <input type="password" id="confirmPassword" name="confirm_password" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closePasswordModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Alterar Senha</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.config-container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.config-header {
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.config-header h2 {
+    color: var(--text-color-light);
+    margin-bottom: 8px;
+}
+
+.config-header p {
+    color: var(--text-color-light-2);
+    margin: 0;
+}
+
+.config-filters {
+    margin-bottom: 24px;
+}
+
+.filter-group {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: var(--dark-bg-2);
+    color: var(--text-color-light-2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-btn:hover,
+.filter-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.users-list {
+    display: grid;
+    gap: 16px;
+}
+
+.user-card {
+    background: var(--dark-bg-2);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.user-card:hover {
+    border-color: var(--primary-color);
+    background: var(--dark-bg-hover);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.user-avatar i {
+    font-size: 48px;
+    color: var(--text-color-light-2);
+}
+
+.user-details h3 {
+    margin: 0 0 4px 0;
+    color: var(--text-color-light);
+}
+
+.user-details p {
+    margin: 0 0 8px 0;
+    color: var(--text-color-light-2);
+    font-size: 0.9em;
+}
+
+.user-badges {
+    display: flex;
+    gap: 8px;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.badge.admin {
+    background: rgba(162, 89, 255, 0.2);
+    color: var(--primary-color);
+}
+
+.badge.user {
+    background: rgba(108, 117, 125, 0.2);
+    color: #6c757d;
+}
+
+.badge.active {
+    background: rgba(40, 167, 69, 0.2);
+    color: #28a745;
+}
+
+.badge.disabled {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+.user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    background: var(--dark-bg-1);
+    color: var(--text-color-light-2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    background: var(--dark-bg-hover);
+    transform: translateY(-1px);
+}
+
+.toggle-admin:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+.toggle-status:hover {
+    background: #28a745;
+    color: white;
+}
+
+.change-password:hover {
+    background: #ffc107;
+    color: #000;
+}
+
+.delete-user:hover {
+    background: #dc3545;
+    color: white;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--dark-bg-2);
+    margin: 15% auto;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90%;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-color-light);
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-color-light-2);
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-color-light);
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--dark-bg-1);
+    color: var(--text-color-light);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.btn-secondary {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: var(--dark-bg-1);
+    color: var(--text-color-light-2);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    padding: 8px 16px;
+    border: none;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+</style>
+
+<script>
+// Filtros
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        // Remove active de todos os botões
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        // Adiciona active ao botão clicado
+        this.classList.add('active');
+        
+        const filter = this.dataset.filter;
+        const cards = document.querySelectorAll('.user-card');
+        
+        cards.forEach(card => {
+            const userType = card.dataset.userType;
+            const status = card.dataset.status;
+            
+            if (filter === 'all') {
+                card.style.display = 'flex';
+            } else if (filter === 'disabled') {
+                card.style.display = status === 'disabled' ? 'flex' : 'none';
+            } else {
+                card.style.display = userType === filter ? 'flex' : 'none';
+            }
+        });
+    });
+});
+
+// Toggle Admin
+function toggleAdmin(userId, currentType) {
+    const newType = currentType === 'admin' ? 'user' : 'admin';
+    
+    if (confirm(`Tem certeza que deseja ${newType === 'admin' ? 'tornar este usuário administrador' : 'remover privilégios de administrador'}?`)) {
+        fetch('/config/toggle_admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                user_type: newType
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        });
+    }
+}
+
+// Toggle Status
+function toggleStatus(userId, currentStatus) {
+    const newStatus = currentStatus;
+    const action = newStatus ? 'desabilitar' : 'habilitar';
+    
+    if (confirm(`Tem certeza que deseja ${action} esta conta?`)) {
+        fetch('/config/toggle_status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                disabled: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        });
+    }
+}
+
+// Password Modal
+function openPasswordModal(userId, username) {
+    document.getElementById('userId').value = userId;
+    document.querySelector('.modal-header h3').innerHTML = `<i class="fas fa-key"></i> Alterar Senha - ${username}`;
+    document.getElementById('passwordModal').style.display = 'block';
+}
+
+function closePasswordModal() {
+    document.getElementById('passwordModal').style.display = 'none';
+    document.getElementById('passwordForm').reset();
+}
+
+// Password Form
+document.getElementById('passwordForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const userId = document.getElementById('userId').value;
+    
+    if (newPassword !== confirmPassword) {
+        alert('As senhas não coincidem!');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        alert('A senha deve ter pelo menos 6 caracteres!');
+        return;
+    }
+    
+    fetch('/config/change_password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            new_password: newPassword
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Senha alterada com sucesso!');
+            closePasswordModal();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    });
+});
+
+// Delete User
+function deleteUser(userId, username) {
+    if (confirm(`Tem certeza que deseja EXCLUIR o usuário "${username}"? Esta ação não pode ser desfeita!`)) {
+        fetch('/config/delete_user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        });
+    }
+}
+
+// Fechar modal clicando fora
+window.onclick = function(event) {
+    const modal = document.getElementById('passwordModal');
+    if (event.target == modal) {
+        closePasswordModal();
+    }
+}
+</script>
+{% endblock %}

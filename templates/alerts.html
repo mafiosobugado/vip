@@ -51,7 +51,7 @@
                     </div>
                     <div class="alert-actions">
                         {% if not alert.is_read %}
-                            <button class="btn-action btn-mark-read" onclick="markAsRead({{ alert.id }})" title="Marcar como lido">
+                            <button class="btn-action btn-mark-read" onclick="markAsRead({{ alert.id }}, this)" title="Marcar como lido">
                                 <i class="fas fa-check"></i> Marcar como lido
                             </button>
                         {% endif %}
@@ -101,37 +101,129 @@
 
 {% block scripts %}
 <script>
-function markAsRead(alertId) {
+function markAsRead(alertId, buttonElement) {
+    console.log('🔄 Iniciando markAsRead - ID:', alertId);
+    
+    // Validação dos parâmetros
+    if (!alertId) {
+        console.error('❌ alertId não fornecido');
+        alert('Erro: ID do alerta não fornecido');
+        return;
+    }
+    
+    if (!buttonElement) {
+        console.error('❌ buttonElement não fornecido');
+        alert('Erro: Elemento do botão não encontrado');
+        return;
+    }
+    
+    // Encontrar elementos
+    const button = buttonElement;
+    const alertCard = document.querySelector(`[data-alert-id="${alertId}"]`);
+    
+    if (!alertCard) {
+        console.error('❌ Alert card não encontrado para ID:', alertId);
+        alert('Erro: Card do alerta não encontrado');
+        return;
+    }
+    
+    console.log('✅ Elementos encontrados - Button:', !!button, 'Card:', !!alertCard);
+    
+    // Desabilitar botão e mostrar loading
+    const originalHTML = button.innerHTML;
+    const originalStyle = {
+        backgroundColor: button.style.backgroundColor,
+        color: button.style.color
+    };
+    
+    button.disabled = true;
+    button.innerHTML = '⏳ Marcando...';
+    button.style.backgroundColor = '#6c757d';
+    button.style.color = 'white';
+    
+    console.log('🔄 Fazendo requisição para:', `/mark_alert_read/${alertId}`);
+    
+    // Fazer requisição
     fetch(`/mark_alert_read/${alertId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'same-origin'
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📨 Status da resposta:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`Erro HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    })
     .then(data => {
-        if (data.success) {
-            // Atualizar a interface
-            const alertCard = document.querySelector(`[data-alert-id="${alertId}"]`);
+        console.log('📊 Dados recebidos:', data);
+        
+        if (data && data.success) {
+            console.log('✅ Sucesso confirmado pelo servidor');
+            
+            // 1. Remover classe de não lido
             alertCard.classList.remove('alert-unread');
+            console.log('🎨 Classe alert-unread removida');
             
-            // Remover o indicador de não lido e botão
+            // 2. Remover indicador visual
             const unreadIndicator = alertCard.querySelector('.unread-indicator');
-            const markReadBtn = alertCard.querySelector('.btn-mark-read');
+            if (unreadIndicator) {
+                unreadIndicator.remove();
+                console.log('🎨 Indicador de não lido removido');
+            }
             
-            if (unreadIndicator) unreadIndicator.remove();
-            if (markReadBtn) markReadBtn.remove();
+            // 3. Feedback visual imediato no botão
+            button.innerHTML = '✅ Lido!';
+            button.style.backgroundColor = '#28a745';
+            button.style.color = 'white';
+            console.log('🎨 Botão atualizado para sucesso');
             
-            // Atualizar contadores
-            updateNotificationCount();
-            updateStats();
+            // 4. Remover botão após delay
+            setTimeout(() => {
+                console.log('🗑️ Removendo botão do DOM...');
+                if (button && button.parentNode) {
+                    button.remove();
+                    console.log('✅ Botão removido com sucesso!');
+                }
+            }, 1500);
+            
+            // 5. Atualizar estatísticas
+            setTimeout(() => {
+                try {
+                    updateStats();
+                    console.log('📊 Estatísticas atualizadas');
+                } catch (e) {
+                    console.warn('⚠️ Erro ao atualizar estatísticas:', e);
+                }
+            }, 100);
+            
+            // 6. Mostrar notificação de sucesso
+            showSimpleToast('✅ Alerta marcado como lido!', 'success');
+            
         } else {
-            alert('Erro ao marcar como lido: ' + data.error);
+            throw new Error(data?.error || 'Resposta inválida do servidor');
         }
     })
     .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao marcar como lido.');
+        console.error('❌ Erro completo:', error);
+        
+        // Restaurar estado original do botão
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+        button.style.backgroundColor = originalStyle.backgroundColor;
+        button.style.color = originalStyle.color;
+        
+        // Mostrar erro para o usuário
+        const errorMsg = `Erro ao marcar como lido: ${error.message}`;
+        console.error(errorMsg);
+        alert(errorMsg);
+        
+        showSimpleToast('❌ Erro ao marcar como lido', 'error');
     });
 }
 
@@ -140,14 +232,28 @@ function deleteAlert(alertId) {
         return;
     }
     
+    const alertCard = document.querySelector(`[data-alert-id="${alertId}"]`);
+    if (!alertCard) {
+        console.error('❌ Alert card não encontrado para ID:', alertId);
+        return;
+    }
+    
     fetch(`/delete_alert/${alertId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Remover o alerta da interface com animação
-            const alertCard = document.querySelector(`[data-alert-id="${alertId}"]`);
             alertCard.style.animation = 'slideOut 0.5s ease-out';
             setTimeout(() => {
                 alertCard.remove();
@@ -160,14 +266,18 @@ function deleteAlert(alertId) {
             }, 500);
             
             // Atualizar contadores
-            updateNotificationCount();
+            try {
+                updateNotificationCount();
+            } catch (e) {
+                console.log('⚠️ Erro ao atualizar contador:', e);
+            }
         } else {
-            alert('Erro ao excluir alerta: ' + data.error);
+            throw new Error(data.error || 'Erro desconhecido');
         }
     })
     .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao excluir alerta.');
+        console.error('❌ Erro ao excluir alerta:', error);
+        alert('❌ Erro ao excluir alerta: ' + error.message);
     });
 }
 
@@ -322,11 +432,22 @@ function createSampleAlerts() {
 }
 
 function updateNotificationCount() {
-    fetch('/get_unread_alerts_count')
-    .then(response => response.json())
+    fetch('/get_unread_alerts_count', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         const badge = document.querySelector('.notification-badge');
-        if (badge) {
+        if (badge && typeof data.count === 'number') {
             if (data.count > 0) {
                 badge.textContent = data.count;
                 badge.style.display = 'inline-flex';
@@ -334,76 +455,232 @@ function updateNotificationCount() {
                 badge.style.display = 'none';
             }
         }
+        console.log('📊 Contador de notificações atualizado:', data.count);
     })
-    .catch(error => console.error('Erro ao atualizar contador:', error));
+    .catch(error => {
+        console.error('❌ Erro ao atualizar contador de notificações:', error);
+        // Não mostrar alert para não incomodar o usuário
+    });
 }
 
 function updateStats() {
-    const totalAlerts = document.querySelectorAll('.alert-card').length;
-    const unreadAlerts = document.querySelectorAll('.alert-unread').length;
+    try {
+        console.log('📊 Atualizando estatísticas...');
+        
+        const alertCards = document.querySelectorAll('.alert-card');
+        const unreadAlerts = document.querySelectorAll('.alert-unread');
+        
+        const totalCount = alertCards.length;
+        const unreadCount = unreadAlerts.length;
+        
+        console.log(`📊 Total: ${totalCount}, Não lidos: ${unreadCount}`);
+        
+        // Atualizar elementos na página
+        const totalElement = document.getElementById('totalAlerts');
+        const unreadElement = document.getElementById('unreadAlerts');
+        
+        if (totalElement) {
+            totalElement.textContent = totalCount;
+            console.log('📊 Total atualizado no DOM');
+        } else {
+            console.warn('⚠️ Elemento #totalAlerts não encontrado');
+        }
+        
+        if (unreadElement) {
+            unreadElement.textContent = unreadCount;
+            console.log('📊 Não lidos atualizado no DOM');
+        } else {
+            console.warn('⚠️ Elemento #unreadAlerts não encontrado');
+        }
+        
+        console.log('✅ Estatísticas atualizadas com sucesso');
+        
+    } catch (error) {
+        console.error('❌ Erro ao atualizar estatísticas:', error);
+    }
+}
+
+function showSimpleToast(message, type = 'info') {
+    console.log('📄 Exibindo toast:', message);
     
-    const totalElement = document.getElementById('totalAlerts');
-    const unreadElement = document.getElementById('unreadAlerts');
-    
-    if (totalElement) totalElement.textContent = totalAlerts;
-    if (unreadElement) unreadElement.textContent = unreadAlerts;
+    try {
+        // Remover toasts anteriores
+        const existingToasts = document.querySelectorAll('.simple-toast');
+        existingToasts.forEach(toast => toast.remove());
+        
+        // Criar novo toast
+        const toast = document.createElement('div');
+        toast.className = 'simple-toast';
+        toast.textContent = message;
+        
+        // Definir cores baseado no tipo
+        let backgroundColor = '#007bff'; // info
+        if (type === 'success') backgroundColor = '#28a745';
+        if (type === 'error') backgroundColor = '#dc3545';
+        if (type === 'warning') backgroundColor = '#ffc107';
+        
+        // Aplicar estilos
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${backgroundColor};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            max-width: 300px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        `;
+        
+        // Adicionar ao DOM
+        document.body.appendChild(toast);
+        
+        // Animar entrada
+        setTimeout(() => {
+            toast.style.transform = 'translateX(0)';
+        }, 50);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+        
+    } catch (error) {
+        console.error('❌ Erro ao exibir toast:', error);
+        // Fallback absoluto
+        console.log('📢 TOAST FALLBACK:', message);
+    }
 }
 
 function showToast(message, type = 'info') {
-    // Criar toast
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-        <span>${message}</span>
-    `;
-    
-    // Adicionar estilos
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'success' ? 'linear-gradient(135deg, #28a745, #20c997)' : 'linear-gradient(135deg, #007bff, #0056b3)'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 10px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-weight: 600;
-        transform: translateX(400px);
-        transition: transform 0.3s ease;
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Animar entrada
-    setTimeout(() => {
-        toast.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Remover após 3 segundos
-    setTimeout(() => {
-        toast.style.transform = 'translateX(400px)';
+    try {
+        // Criar toast
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        
+        // Usar innerHTML mais seguro
+        const iconClass = type === 'success' ? 'check-circle' : 
+                         type === 'error' ? 'exclamation-circle' : 'info-circle';
+        
+        toast.innerHTML = `
+            <i class="fas fa-${iconClass}"></i>
+            <span>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+        `;
+        
+        // Adicionar estilos
+        const bgColor = type === 'success' ? 'linear-gradient(135deg, #28a745, #20c997)' : 
+                       type === 'error' ? 'linear-gradient(135deg, #dc3545, #c82333)' : 
+                       'linear-gradient(135deg, #007bff, #0056b3)';
+        
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${bgColor};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            max-width: 300px;
+            font-size: 14px;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animar entrada
         setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
-        }, 300);
-    }, 3000);
+            toast.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            toast.style.transform = 'translateX(400px)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+        
+        console.log('📄 Toast exibido:', message);
+        
+    } catch (error) {
+        console.error('❌ Erro ao exibir toast:', error);
+        // Fallback para alert simples
+        const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+        alert(`${emoji} ${message}`);
+    }
 }
 
-// Animação para entrada dos cards
+// Inicialização da página
 document.addEventListener('DOMContentLoaded', function() {
-    const cards = document.querySelectorAll('.alert-card');
-    cards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.1}s`;
-    });
+    console.log('📄 Página de alertas carregada - Iniciando configuração...');
+    
+    try {
+        // Verificar elementos essenciais
+        const alertCards = document.querySelectorAll('.alert-card');
+        const unreadCards = document.querySelectorAll('.alert-unread');
+        const markReadButtons = document.querySelectorAll('.btn-mark-read');
+        
+        console.log(`📊 Elementos encontrados:
+        - Cards de alerta: ${alertCards.length}
+        - Cards não lidos: ${unreadCards.length}
+        - Botões marcar como lido: ${markReadButtons.length}`);
+        
+        // Aplicar animação de entrada nos cards
+        alertCards.forEach((card, index) => {
+            if (card.style) {
+                card.style.animationDelay = `${index * 0.1}s`;
+            }
+        });
+        console.log('🎨 Animações aplicadas aos cards');
+        
+        // Verificar se há alertas não lidos
+        if (unreadCards.length > 0) {
+            console.log(`📢 ${unreadCards.length} alerta(s) não lido(s) encontrado(s)`);
+        } else {
+            console.log('✅ Todos os alertas foram lidos');
+        }
+        
+        // Inicializar contadores
+        updateStats();
+        console.log('📊 Contadores inicializados');
+        
+        // Verificar se botões estão funcionais
+        markReadButtons.forEach((button, index) => {
+            if (button.onclick) {
+                console.log(`✅ Botão ${index + 1} tem evento onclick configurado`);
+            } else {
+                console.warn(`⚠️ Botão ${index + 1} NÃO tem evento onclick`);
+            }
+        });
+        
+        console.log('✅ Inicialização da página concluída com sucesso');
+        
+    } catch (error) {
+        console.error('❌ Erro durante inicialização da página:', error);
+        showSimpleToast('⚠️ Erro na inicialização da página', 'warning');
+    }
 });
 
-// Animação para remoção
+// Adicionar animação slideOut e fadeOut
 const style = document.createElement('style');
 style.textContent = `
     @keyframes slideOut {
@@ -415,6 +692,26 @@ style.textContent = `
             opacity: 0;
             transform: translateX(100%) scale(0.8);
         }
+    }
+    
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+            transform: scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+    }
+    
+    .btn-mark-read:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .btn-mark-read.loading {
+        background: #6c757d !important;
     }
 `;
 document.head.appendChild(style);

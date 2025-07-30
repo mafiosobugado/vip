@@ -67,13 +67,25 @@ def login():
         if request.method == 'POST':
             username = request.form['username']
             password = request.form['password']
+            user_type = request.form.get('user_type', 'user')  # Captura o tipo de usuário selecionado
             user = database.User.get_by_username(username)
 
             if user and check_password_hash(user.password, password):
-                login_user(user, remember=True) # remember=True cria uma sessão permanente
-                log_user_action('Login realizado', f'Usuário {username} fez login no sistema')
-                flash('Login bem-sucedido!', 'success')
-                return redirect(url_for('dashboard'))
+                # Verificar se a conta está desabilitada
+                if user.disabled:
+                    log_user_action('Tentativa de login com conta desabilitada', f'Usuário {username} tentou fazer login com conta desabilitada')
+                    flash('Sua conta foi desabilitada. Entre em contato com o administrador.', 'danger')
+                    return render_template('login.html')
+                
+                # Verificar se o tipo de usuário selecionado corresponde ao tipo no banco
+                if user.user_type == user_type:
+                    login_user(user, remember=True) # remember=True cria uma sessão permanente
+                    log_user_action('Login realizado', f'Usuário {username} ({user_type}) fez login no sistema')
+                    flash('Login bem-sucedido!', 'success')
+                    return redirect(url_for('dashboard'))
+                else:
+                    log_user_action('Tentativa de login com tipo incorreto', f'Usuário {username} tentou fazer login como {user_type}, mas é {user.user_type}')
+                    flash('Tipo de usuário incorreto. Verifique se você selecionou a opção correta.', 'danger')
             else:
                 log_user_action('Tentativa de login falhada', f'Tentativa de login falhada para usuário: {username}')
                 flash('Nome de usuário ou senha inválidos.', 'danger')
@@ -95,6 +107,7 @@ def register():
             email = request.form['email']
             password = request.form['password']
             confirm_password = request.form['confirm_password']
+            user_type = request.form.get('user_type', 'user')
 
             if password != confirm_password:
                 flash('As senhas não coincidem!', 'danger')
@@ -102,8 +115,10 @@ def register():
 
             hashed_password = generate_password_hash(password, method='scrypt') # Método seguro
 
-            if database.User.create(username, email, hashed_password):
-                flash('Conta criada com sucesso! Faça login.', 'success')
+            if database.User.create(username, email, hashed_password, user_type):
+                user_type_text = 'Administrador' if user_type == 'admin' else 'Usuário'
+                log_user_action('Usuário registrado', f'Novo {user_type_text.lower()}: {username} ({email})')
+                flash(f'Conta de {user_type_text.lower()} criada com sucesso! Faça login.', 'success')
                 return redirect(url_for('login'))
             else:
                 flash('Nome de usuário ou email já existem.', 'danger')
@@ -578,13 +593,16 @@ def alerts():
 @login_required
 def mark_alert_read(alert_id):
     """Marca um alerta como lido."""
+    print(f"🔄 Requisição recebida para marcar alerta {alert_id} como lido")
+    print(f"🔄 Usuário atual: {current_user.username if current_user.is_authenticated else 'Não autenticado'}")
     try:
         database.mark_alert_as_read(alert_id)
         log_user_action('Alerta marcado como lido', f'Alerta ID: {alert_id} foi marcado como lido', 'alerts', alert_id)
-        return {'success': True}
+        print(f"✅ Alerta {alert_id} marcado como lido com sucesso")
+        return jsonify({'success': True})
     except Exception as e:
-        print(f"Erro ao marcar alerta como lido: {e}")
-        return {'success': False, 'error': str(e)}, 500
+        print(f"❌ Erro ao marcar alerta como lido: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/delete_alert/<int:alert_id>', methods=['DELETE'])
 @login_required
@@ -593,10 +611,10 @@ def delete_alert(alert_id):
     try:
         database.delete_alert(alert_id)
         log_user_action('Alerta excluído', f'Alerta ID: {alert_id} foi excluído do sistema', 'alerts', alert_id)
-        return {'success': True}
+        return jsonify({'success': True})
     except Exception as e:
         print(f"Erro ao deletar alerta: {e}")
-        return {'success': False, 'error': str(e)}, 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/get_unread_alerts_count')
 @login_required
@@ -604,10 +622,10 @@ def get_unread_alerts_count():
     """Retorna o número de alertas não lidos."""
     try:
         count = database.get_unread_alerts_count()
-        return {'count': count}
+        return jsonify({'count': count})
     except Exception as e:
         print(f"Erro ao contar alertas: {e}")
-        return {'count': 0}
+        return jsonify({'count': 0})
 
 @app.route('/get_recent_alerts')
 @login_required
@@ -796,6 +814,137 @@ def get_item_images_api(item_id):
     except Exception as e:
         print(f"Erro ao buscar imagens: {e}")
         return {'error': 'Erro interno do servidor'}, 500
+
+# --- ROTAS DE CONFIGURAÇÕES ---
+@app.route('/config')
+@login_required
+def config():
+    try:
+        # Verificar se o usuário é administrador
+        if not current_user.is_authenticated or current_user.user_type != 'admin':
+            flash('Acesso negado. Apenas administradores podem acessar esta página.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        users = database.User.get_all_users()
+        return render_template('config.html', users=users, active_page='config')
+    except Exception as e:
+        print(f"Erro na rota config: {e}")
+        traceback.print_exc()
+        flash('Erro interno. Tente novamente.', 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/config/toggle_admin', methods=['POST'])
+@login_required
+def toggle_admin():
+    try:
+        if not current_user.is_authenticated or current_user.user_type != 'admin':
+            return {'success': False, 'message': 'Acesso negado'}, 403
+        
+        data = request.get_json()
+        user_id = data.get('user_id')
+        new_user_type = data.get('user_type')
+        
+        if not user_id or not new_user_type:
+            return {'success': False, 'message': 'Dados inválidos'}, 400
+        
+        # Não permitir que o usuário remova seus próprios privilégios de admin
+        if user_id == current_user.id and new_user_type != 'admin':
+            return {'success': False, 'message': 'Você não pode remover seus próprios privilégios de administrador'}, 400
+        
+        if database.User.update_user_type(user_id, new_user_type):
+            log_user_action('Alteração de permissão', f'Tipo de usuário alterado para {new_user_type} (ID: {user_id})')
+            return {'success': True, 'message': 'Tipo de usuário atualizado com sucesso'}
+        else:
+            return {'success': False, 'message': 'Erro ao atualizar tipo de usuário'}, 500
+            
+    except Exception as e:
+        print(f"Erro em toggle_admin: {e}")
+        return {'success': False, 'message': 'Erro interno'}, 500
+
+@app.route('/config/toggle_status', methods=['POST'])
+@login_required
+def toggle_status():
+    try:
+        if not current_user.is_authenticated or current_user.user_type != 'admin':
+            return {'success': False, 'message': 'Acesso negado'}, 403
+        
+        data = request.get_json()
+        user_id = data.get('user_id')
+        disabled = data.get('disabled')
+        
+        if not user_id or disabled is None:
+            return {'success': False, 'message': 'Dados inválidos'}, 400
+        
+        # Não permitir que o usuário desabilite sua própria conta
+        if user_id == current_user.id:
+            return {'success': False, 'message': 'Você não pode desabilitar sua própria conta'}, 400
+        
+        if database.User.update_user_status(user_id, disabled):
+            action = 'desabilitada' if disabled else 'habilitada'
+            log_user_action('Alteração de status', f'Conta {action} (ID: {user_id})')
+            return {'success': True, 'message': f'Conta {action} com sucesso'}
+        else:
+            return {'success': False, 'message': 'Erro ao atualizar status da conta'}, 500
+            
+    except Exception as e:
+        print(f"Erro em toggle_status: {e}")
+        return {'success': False, 'message': 'Erro interno'}, 500
+
+@app.route('/config/change_password', methods=['POST'])
+@login_required
+def change_password():
+    try:
+        if not current_user.is_authenticated or current_user.user_type != 'admin':
+            return {'success': False, 'message': 'Acesso negado'}, 403
+        
+        data = request.get_json()
+        user_id = data.get('user_id')
+        new_password = data.get('new_password')
+        
+        if not user_id or not new_password:
+            return {'success': False, 'message': 'Dados inválidos'}, 400
+        
+        if len(new_password) < 6:
+            return {'success': False, 'message': 'A senha deve ter pelo menos 6 caracteres'}, 400
+        
+        hashed_password = generate_password_hash(new_password, method='scrypt')
+        
+        if database.User.update_user_password(user_id, hashed_password):
+            log_user_action('Alteração de senha', f'Senha alterada por administrador (ID: {user_id})')
+            return {'success': True, 'message': 'Senha alterada com sucesso'}
+        else:
+            return {'success': False, 'message': 'Erro ao alterar senha'}, 500
+            
+    except Exception as e:
+        print(f"Erro em change_password: {e}")
+        return {'success': False, 'message': 'Erro interno'}, 500
+
+@app.route('/config/delete_user', methods=['POST'])
+@login_required
+def delete_user():
+    try:
+        if not current_user.is_authenticated or current_user.user_type != 'admin':
+            return {'success': False, 'message': 'Acesso negado'}, 403
+        
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return {'success': False, 'message': 'Dados inválidos'}, 400
+        
+        # Não permitir que o usuário delete sua própria conta
+        if user_id == current_user.id:
+            return {'success': False, 'message': 'Você não pode deletar sua própria conta'}, 400
+        
+        if database.User.delete_user(user_id):
+            log_user_action('Exclusão de usuário', f'Usuário deletado (ID: {user_id})')
+            return {'success': True, 'message': 'Usuário deletado com sucesso'}
+        else:
+            return {'success': False, 'message': 'Erro ao deletar usuário'}, 500
+            
+    except Exception as e:
+        print(f"Erro em delete_user: {e}")
+        return {'success': False, 'message': 'Erro interno'}, 500
 
 # --- Inicialização do banco de dados ---
 try:
