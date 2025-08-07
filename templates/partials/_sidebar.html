@@ -39,6 +39,12 @@
                     <span>Auditoria</span>
                 </a>
             </li>
+            <li class="nav-item {% if active_page == 'ai_assistant' %}active{% endif %}">
+                <a href="{{ url_for('ai_assistant') }}">
+                    <i class="fas fa-fw fa-robot"></i>
+                    <span>Perguntas?</span>
+                </a>
+            </li>
         </ul>
     </nav>
     <div class="sidebar-footer">

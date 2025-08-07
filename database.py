@@ -396,10 +396,22 @@ def get_identified_items_trend_data(num_weeks=8):
     counts = []
 
     for i in range(num_weeks - 1, -1, -1):
+        # Calcular início e fim da semana
         date_n_weeks_ago = today - datetime.timedelta(weeks=i)
-        dates.append(date_n_weeks_ago.isoformat())
-
-        count = conn.execute('SELECT COUNT(*) FROM items WHERE identified_date = ?', (date_n_weeks_ago.isoformat(),)).fetchone()[0]
+        
+        # Obter o início da semana (segunda-feira)
+        start_of_week = date_n_weeks_ago - datetime.timedelta(days=date_n_weeks_ago.weekday())
+        # Obter o fim da semana (domingo)
+        end_of_week = start_of_week + datetime.timedelta(days=6)
+        
+        # Usar a data do início da semana como label
+        dates.append(start_of_week.strftime('%d/%m'))
+        
+        # Contar itens identificados nessa semana
+        count = conn.execute('''
+            SELECT COUNT(*) FROM items 
+            WHERE identified_date BETWEEN ? AND ?
+        ''', (start_of_week.isoformat(), end_of_week.isoformat())).fetchone()[0]
         counts.append(count)
 
     conn.close()

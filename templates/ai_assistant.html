@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Perguntas?{% endblock %}
+
+{% block page_title %}Perguntas?{% endblock %}
+
+{% block content %}
+<div class="ai-page-container">
+    <div class="ai-page-header">
+        <h2>Assistente de Cybersegurança</h2>
+        <p class="ai-subtitle">Tire suas dúvidas sobre cybersegurança, ameaças e boas práticas de segurança</p>
+    </div>
+
+    <!-- Seção de Assistente IA para Cybersegurança -->
+    <div class="ai-assistant-section">
+        <div class="ai-card">
+            <div class="ai-header">
+                <div class="ai-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3>Como posso ajudá-lo hoje?</h3>
+                <p>Sou especializado em cybersegurança e posso responder perguntas sobre:</p>
+                <ul class="ai-capabilities">
+                    <li><i class="fas fa-check"></i> Ataques de phishing e engenharia social</li>
+                    <li><i class="fas fa-check"></i> Segurança de senhas e autenticação</li>
+                    <li><i class="fas fa-check"></i> Proteção de dados executivos</li>
+                    <li><i class="fas fa-check"></i> Resposta a incidentes de segurança</li>
+                    <li><i class="fas fa-check"></i> Boas práticas de cybersegurança</li>
+                    <li><i class="fas fa-check"></i> Compliance e regulamentações (LGPD, ISO 27001)</li>
+                </ul>
+            </div>
+            
+            <div class="ai-chat-container">
+                <div class="ai-chat-messages" id="aiChatMessages">
+                    <div class="ai-message ai-bot">
+                        <div class="ai-message-content">
+                            <i class="fas fa-robot"></i>
+                            <span>Olá! Sou seu assistente especializado em cybersegurança. Estou aqui para ajudá-lo com questões relacionadas à segurança digital, proteção de dados e melhores práticas. Como posso ajudá-lo hoje?</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="ai-input-container">
+                    <div class="ai-input-group">
+                        <input type="text" id="aiQuestion" placeholder="Digite sua pergunta sobre cybersegurança..." maxlength="500">
+                        <button id="aiSendBtn" onclick="sendAiQuestion()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <div class="ai-suggestions">
+                        <span class="suggestion-label">Perguntas frequentes:</span>
+                        <button class="suggestion-btn" onclick="setSuggestion('Como identificar um ataque de phishing?')">
+                            <i class="fas fa-fish"></i> Phishing
+                        </button>
+                        <button class="suggestion-btn" onclick="setSuggestion('Quais são as melhores práticas para senhas seguras?')">
+                            <i class="fas fa-key"></i> Senhas Seguras
+                        </button>
+                        <button class="suggestion-btn" onclick="setSuggestion('Como proteger dados executivos?')">
+                            <i class="fas fa-shield-alt"></i> Proteção de Dados
+                        </button>
+                        <button class="suggestion-btn" onclick="setSuggestion('O que fazer em caso de vazamento de dados?')">
+                            <i class="fas fa-exclamation-triangle"></i> Vazamento de Dados
+                        </button>
+                        <button class="suggestion-btn" onclick="setSuggestion('Como implementar autenticação de dois fatores?')">
+                            <i class="fas fa-mobile-alt"></i> 2FA
+                        </button>
+                        <button class="suggestion-btn" onclick="setSuggestion('Quais são os principais tipos de malware?')">
+                            <i class="fas fa-virus"></i> Malware
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção de Recursos Adicionais -->
+    <div class="ai-resources-section">
+        <div class="resources-header">
+            <h3>Recursos Adicionais</h3>
+        </div>
+        <div class="resources-grid">
+            <div class="resource-card">
+                <i class="fas fa-book"></i>
+                <h4>Guias de Segurança</h4>
+                <p>Acesse nossos guias completos sobre cybersegurança</p>
+            </div>
+            <div class="resource-card">
+                <i class="fas fa-shield-virus"></i>
+                <h4>Ferramentas de Análise</h4>
+                <p>Utilize ferramentas para análise de ameaças</p>
+            </div>
+            <div class="resource-card">
+                <i class="fas fa-graduation-cap"></i>
+                <h4>Treinamentos</h4>
+                <p>Participe de treinamentos em cybersegurança</p>
+            </div>
+            <div class="resource-card">
+                <i class="fas fa-users"></i>
+                <h4>Comunidade</h4>
+                <p>Conecte-se com outros profissionais de segurança</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funções do Assistente IA
+function setSuggestion(question) {
+    document.getElementById('aiQuestion').value = question;
+}
+
+function sendAiQuestion() {
+    const questionInput = document.getElementById('aiQuestion');
+    const question = questionInput.value.trim();
+    
+    if (!question) {
+        alert('Por favor, digite uma pergunta.');
+        return;
+    }
+    
+    addMessageToChat(question, 'user');
+    questionInput.value = '';
+    
+    // Simular resposta da IA (aqui você pode integrar com uma API real)
+    addTypingIndicator();
+    
+    setTimeout(() => {
+        removeTypingIndicator();
+        const response = generateAiResponse(question);
+        addMessageToChat(response, 'bot');
+    }, 1500);
+}
+
+function addMessageToChat(message, sender) {
+    const chatMessages = document.getElementById('aiChatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `ai-message ai-${sender}`;
+    
+    if (sender === 'user') {
+        messageDiv.innerHTML = `
+            <div class="ai-message-content">
+                <i class="fas fa-user"></i>
+                <span>${message}</span>
+            </div>
+        `;
+    } else {
+        messageDiv.innerHTML = `
+            <div class="ai-message-content">
+                <i class="fas fa-robot"></i>
+                <span>${message}</span>
+            </div>
+        `;
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addTypingIndicator() {
+    const chatMessages = document.getElementById('aiChatMessages');
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'ai-message ai-bot typing-indicator';
+    typingDiv.id = 'typingIndicator';
+    typingDiv.innerHTML = `
+        <div class="ai-message-content">
+            <i class="fas fa-robot"></i>
+            <span class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </span>
+        </div>
+    `;
+    
+    chatMessages.appendChild(typingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
+}
+
+function generateAiResponse(question) {
+    const responses = {
+        'phishing': 'Para identificar ataques de phishing: 1) Verifique o remetente e domínio do email, 2) Desconfie de URLs suspeitas, 3) Não clique em links ou baixe anexos de fontes não confiáveis, 4) Procure por erros de ortografia e gramática, 5) Verifique se a solicitação é urgente ou ameaçadora, 6) Confirme diretamente com o suposto remetente por outro meio.',
+        'senha': 'Melhores práticas para senhas seguras: 1) Use pelo menos 12 caracteres, 2) Combine letras maiúsculas, minúsculas, números e símbolos, 3) Use senhas únicas para cada conta, 4) Utilize um gerenciador de senhas, 5) Ative autenticação de dois fatores (2FA), 6) Evite informações pessoais, 7) Troque senhas regularmente.',
+        'proteção': 'Para proteger dados executivos: 1) Implemente controles de acesso rigorosos, 2) Use criptografia para dados sensíveis, 3) Monitore acessos e atividades, 4) Realize backups seguros regulares, 5) Treine executivos sobre ameaças, 6) Mantenha sistemas atualizados, 7) Implemente VPN para acesso remoto.',
+        'vazamento': 'Em caso de vazamento de dados: 1) Contenha imediatamente o incidente, 2) Avalie o escopo e impacto, 3) Notifique as autoridades competentes (ANPD/LGPD), 4) Comunique aos afetados em até 72h, 5) Implemente medidas corretivas, 6) Documente tudo para análise forense, 7) Revise políticas de segurança.',
+        '2fa': 'Para implementar autenticação de dois fatores: 1) Use aplicativos como Google Authenticator ou Authy, 2) Configure backup codes, 3) Prefira apps de autenticação a SMS, 4) Ative 2FA em todas as contas críticas, 5) Treine usuários sobre o uso, 6) Mantenha dispositivos seguros.',
+        'malware': 'Principais tipos de malware: 1) Vírus - se anexam a arquivos, 2) Worms - se propagam automaticamente, 3) Trojans - disfarçados como software legítimo, 4) Ransomware - criptografam dados por resgate, 5) Spyware - coletam informações, 6) Rootkits - ocultam presença no sistema, 7) Adware - exibem anúncios indesejados.'
+    };
+    
+    const lowerQuestion = question.toLowerCase();
+    
+    if (lowerQuestion.includes('phishing') || lowerQuestion.includes('email') || lowerQuestion.includes('link')) {
+        return responses.phishing;
+    } else if (lowerQuestion.includes('senha') || lowerQuestion.includes('password') || lowerQuestion.includes('autenticação')) {
+        return responses.senha;
+    } else if (lowerQuestion.includes('proteger') || lowerQuestion.includes('proteção') || lowerQuestion.includes('executivo')) {
+        return responses.proteção;
+    } else if (lowerQuestion.includes('vazamento') || lowerQuestion.includes('breach') || lowerQuestion.includes('incidente')) {
+        return responses.vazamento;
+    } else if (lowerQuestion.includes('2fa') || lowerQuestion.includes('dois fatores') || lowerQuestion.includes('autenticação dupla')) {
+        return responses['2fa'];
+    } else if (lowerQuestion.includes('malware') || lowerQuestion.includes('vírus') || lowerQuestion.includes('ransomware')) {
+        return responses.malware;
+    } else {
+        return 'Essa é uma ótima pergunta sobre cybersegurança! Para uma resposta mais específica, tente reformular sua pergunta ou escolha uma das sugestões acima. Posso ajudar com tópicos como phishing, senhas seguras, proteção de dados, resposta a incidentes, autenticação de dois fatores e tipos de malware.';
+    }
+}
+
+// Permitir envio com Enter
+document.getElementById('aiQuestion').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendAiQuestion();
+    }
+});
+</script>
+{% endblock %}

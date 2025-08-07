@@ -60,6 +60,7 @@ def not_found_error(error):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """Rota de login para o módulo VIP Monitoring."""
     try:
         if current_user.is_authenticated:
             return redirect(url_for('dashboard'))
@@ -95,6 +96,11 @@ def login():
         traceback.print_exc()
         flash('Erro interno. Tente novamente.', 'danger')
         return render_template('login.html')
+
+@app.route('/vip_login_handler', methods=['GET', 'POST'])
+def vip_login_handler():
+    """Handler de login específico para o módulo VIP Monitoring - redirecionamento."""
+    return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -147,13 +153,24 @@ def logout():
 
 @app.route('/')
 def index():
+    """Rota principal - redireciona para a plataforma CTI."""
+    return redirect(url_for('cti_platform'))
+
+@app.route('/cti_platform')
+def cti_platform():
+    """Página inicial da plataforma CTI com seleção de módulos."""
+    return render_template('cti_platform.html')
+
+@app.route('/vip_login')
+def vip_login():
+    """Rota específica para login do módulo VIP Monitoring."""
     try:
         if current_user.is_authenticated:
             return redirect(url_for('dashboard'))
-        return redirect(url_for('login'))
+        return render_template('login.html')
     except Exception as e:
-        print(f"Erro na rota index: {e}")
-        return redirect(url_for('login'))
+        print(f"Erro na rota vip_login: {e}")
+        return render_template('login.html')
 
 @app.route('/dashboard')
 @login_required
@@ -705,6 +722,13 @@ def create_sample_audit_logs():
     except Exception as e:
         print(f"Erro ao criar logs de auditoria de exemplo: {e}")
         return {'success': False, 'error': str(e)}, 500
+
+# --- Rota para ASSISTENTE IA ---
+@app.route('/ai_assistant')
+@login_required
+def ai_assistant():
+    """Página do assistente de IA para cybersegurança."""
+    return render_template('ai_assistant.html', active_page='ai_assistant')
 
 # --- Rotas para imagens múltiplas ---
 @app.route('/add_item_image/<int:item_id>', methods=['POST'])

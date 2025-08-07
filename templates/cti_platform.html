@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTI Platform - Cyber Threat Intelligence</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cti_platform.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="cti-container">
+        <!-- Header da plataforma -->
+        <header class="cti-header">
+            <div class="cti-logo">
+                <i class="fas fa-shield-virus"></i>
+                <h1>CTI Platform</h1>
+                
+            </div>
+            <div class="cti-subtitle">
+                <p>Cyber Threat Intelligence & Security Monitoring</p>
+            </div>
+        </header>
+
+        <!-- Seção principal com os módulos -->
+        <main class="cti-main">
+            <div class="modules-container">
+                <h2 class="modules-title">Selecione um Módulo</h2>
+                <div class="modules-grid">
+                    
+                    <!-- Módulo VIP Monitoring - Ativo -->
+                    <div class="module-card active" onclick="accessModule('vip')">
+                        <div class="module-header">
+                            <div class="module-icon vip-icon">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <div class="module-status active">
+                                <i class="fas fa-check-circle"></i>
+                                <span>ATIVO</span>
+                            </div>
+                        </div>
+                        <div class="module-content">
+                            <h3>VIP Monitoring</h3>
+                            <p>Monitoramento e proteção de executivos e dados sensíveis. Sistema completo de análise de riscos e identificação de ameaças direcionadas.</p>
+                            <div class="module-features">
+                                <span class="feature-tag">Executivos</span>
+                                <span class="feature-tag">Análise de Risco</span>
+                                <span class="feature-tag">Alertas</span>
+                            </div>
+                        </div>
+                        <div class="module-footer">
+                            <button class="access-btn">
+                                <i class="fas fa-arrow-right"></i>
+                                Acessar Módulo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Módulo Brand Monitoring - Bloqueado -->
+                    <div class="module-card blocked">
+                        <div class="module-header">
+                            <div class="module-icon brand-icon">
+                                <i class="fas fa-copyright"></i>
+                            </div>
+                            <div class="module-status blocked">
+                                <i class="fas fa-lock"></i>
+                                <span>EM DESENVOLVIMENTO</span>
+                            </div>
+                        </div>
+                        <div class="module-content">
+                            <h3>Brand Monitoring</h3>
+                            <p>Monitoramento de marca e proteção contra falsificação. Detecção de uso indevido de marca e propriedade intelectual na internet.</p>
+                            <div class="module-features">
+                                <span class="feature-tag blocked">Proteção de Marca</span>
+                                <span class="feature-tag blocked">Anti-Falsificação</span>
+                                <span class="feature-tag blocked">Monitoramento Web</span>
+                            </div>
+                        </div>
+                        <div class="module-footer">
+                            <button class="access-btn blocked" disabled>
+                                <i class="fas fa-lock"></i>
+                                Indisponível
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Módulo H.A.D.E.S - Bloqueado -->
+                    <div class="module-card blocked">
+                        <div class="module-header">
+                            <div class="module-icon hades-icon">
+                                <i class="fas fa-fire"></i>
+                            </div>
+                            <div class="module-status blocked">
+                                <i class="fas fa-lock"></i>
+                                <span>EM DESENVOLVIMENTO</span>
+                            </div>
+                        </div>
+                        <div class="module-content">
+                            <h3>H.A.D.E.S</h3>
+                            <p>Hybrid Advanced Detection & Emergency System. Sistema avançado de detecção de ameaças e resposta automática a incidentes de segurança.</p>
+                            <div class="module-features">
+                                <span class="feature-tag blocked">Detecção Avançada</span>
+                                <span class="feature-tag blocked">Resposta Automática</span>
+                                <span class="feature-tag blocked">AI/ML</span>
+                            </div>
+                        </div>
+                        <div class="module-footer">
+                            <button class="access-btn blocked" disabled>
+                                <i class="fas fa-lock"></i>
+                                Indisponível
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+
+        <!-- Rodapé com informações -->
+        <footer class="cti-footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p>&copy; 2025 CTI Platform. Todos os direitos reservados.</p>
+                    <p>Plataforma de Inteligência de Ameaças Cibernéticas</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#" class="footer-link">Documentação</a>
+                    <a href="#" class="footer-link">Suporte</a>
+                    <a href="#" class="footer-link">Status do Sistema</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal de loading para transição -->
+    <div id="loadingModal" class="loading-modal">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h3>Carregando Módulo...</h3>
+            <p>Aguarde enquanto redirecionamos você para o <span id="moduleName">VIP Monitoring</span></p>
+        </div>
+    </div>
+
+    <script>
+        function accessModule(moduleType) {
+            if (moduleType === 'vip') {
+                // Mostrar modal de loading
+                const modal = document.getElementById('loadingModal');
+                modal.style.display = 'flex';
+                
+                // Simular loading e redirecionar para o VIP Monitoring
+                setTimeout(() => {
+                    window.location.href = '/login'; // Redireciona para a rota Flask de login
+                }, 2000);
+            }
+        }
+
+        // Efeitos visuais para os cards
+        document.querySelectorAll('.module-card.active').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-10px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+
+        // Animação de entrada dos cards
+        window.addEventListener('load', function() {
+            const cards = document.querySelectorAll('.module-card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 200);
+            });
+        });
+    </script>
+</body>
+</html>
